@@ -5,7 +5,7 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 const BIDANG = require('../config/bidang');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }

@@ -36,10 +36,18 @@ const seedUsers = db.transaction((list) => {
   }
 });
 
-seedUsers(users);
-
-console.log('Seed selesai. Akun default (password: %s):', defaultPassword);
-for (const u of users) {
-  console.log(`  - ${u.role.padEnd(12)} | username: ${u.username}`);
+function seed({ log = true } = {}) {
+  seedUsers(users);
+  if (!log) return;
+  console.log('Seed selesai. Akun default (password: %s):', defaultPassword);
+  for (const u of users) {
+    console.log(`  - ${u.role.padEnd(12)} | username: ${u.username}`);
+  }
 }
-process.exit(0);
+
+if (require.main === module) {
+  seed();
+  process.exit(0);
+}
+
+module.exports = { seed };

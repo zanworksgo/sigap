@@ -5,7 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 
-const UPLOAD_ROOT = path.join(__dirname, '..', 'uploads');
+const UPLOAD_ROOT = process.env.UPLOAD_ROOT || path.join(__dirname, '..', 'uploads');
 
 const ALLOWED = {
   '.pdf': ['application/pdf'],

@@ -7,13 +7,18 @@ const express = require('express');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 
-const { init } = require('./db/database');
+const { init, db } = require('./db/database');
 const { MODULES, ROLE_ACCESS, canAccess, canWrite } = require('./config/permissions');
 const BIDANG = require('./config/bidang');
 const format = require('./utils/format');
 const { requireAuth } = require('./middleware/auth');
 
 init();
+
+// First run on a fresh database (e.g. new hosting volume): create default users.
+if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
+  require('./db/seed').seed({ log: false });
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,7 +48,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const dataDir = path.join(__dirname, 'data');
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 app.use(session({
