@@ -17,6 +17,12 @@ init();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Behind a hosting proxy (Railway/Nginx) so secure cookies work.
+if (IS_PRODUCTION) {
+  app.set('trust proxy', 1);
+}
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -48,7 +54,8 @@ app.use(session({
   cookie: {
     httpOnly: true,
     maxAge: 1000 * 60 * 60 * 8, // 8 hours
-    sameSite: 'lax'
+    sameSite: 'lax',
+    secure: IS_PRODUCTION
   }
 }));
 
