@@ -1,0 +1,128 @@
+<%- include('../partials/top') %>
+<% const writable = canWrite(mod); %>
+
+<form class="toolbar" method="GET" action="<%= base %>" data-noguard>
+  <div class="grow">
+    <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari nama program kerja..." />
+  </div>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">Semua Status</option>
+    <% statuses.forEach(function(s) { %>
+      <option value="<%= s.key %>" <%= filters.status === s.key ? 'selected' : '' %>><%= s.label %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="btn">Cari</button>
+  <div class="toolbar-right">
+    <a class="btn" target="_blank" href="<%= base %>/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
+    </a>
+    <% if (writable) { %>
+      <button type="button" class="btn btn-primary" onclick="openAdd()">
+        <%- include('../partials/icon', { name: 'plus' }) %> Tambah Program
+      </button>
+    <% } %>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>No.</th><th>Nama Program Kerja</th><th>Target</th><th>Status</th><th class="text-center">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="5" class="empty">Belum ada program kerja.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><b><%= r.nama_program %></b></td>
+            <td><div class="cell-clamp"><%= r.target || '-' %></div></td>
+            <td>
+              <% if (writable) { %>
+                <form method="POST" action="<%= base %>/<%= r.id %>/status" data-noguard style="display:inline">
+                  <select name="status" class="status-select status-<%= r.status %>" onchange="this.form.submit()" aria-label="Ubah status">
+                    <% statuses.forEach(function(s) { %>
+                      <option value="<%= s.key %>" <%= r.status === s.key ? 'selected' : '' %>><%= s.label %></option>
+                    <% }); %>
+                  </select>
+                </form>
+              <% } else { %>
+                <span class="badge status-<%= r.status %>"><%= (statuses.find(s => s.key === r.status) || {}).label || r.status %></span>
+              <% } %>
+            </td>
+            <td>
+              <div class="action-group" style="justify-content:center;">
+                <% if (writable) { %>
+                  <button class="btn btn-icon btn-sm" title="Edit" onclick='openEdit(<%- JSON.stringify(r) %>)'><%- include('../partials/icon', { name: 'edit' }) %></button>
+                  <form method="POST" action="<%= base %>/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus program kerja ini?')">
+                    <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
+                  </form>
+                <% } else { %>
+                  <span class="muted">-</span>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% if (writable) { %>
+<div class="modal-backdrop" id="formModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="formTitle">Tambah Program Kerja</span>
+      <button class="modal-close" onclick="closeModal('formModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <form id="progForm" method="POST" action="<%= base %>">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nama Program Kerja <span class="req">*</span></label>
+          <input type="text" name="nama_program" id="p_nama" required />
+        </div>
+        <div class="form-group">
+          <label>Target</label>
+          <textarea name="target" id="p_target" rows="2" placeholder="Target/sasaran program kerja..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Status <span class="req">*</span></label>
+          <select name="status" id="p_status" required>
+            <% statuses.forEach(function(s) { %><option value="<%= s.key %>"><%= s.label %></option><% }); %>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('formModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<script>
+  var BASE_URL = <%- JSON.stringify(base) %>;
+  function openAdd() {
+    document.getElementById('formTitle').textContent = 'Tambah Program Kerja';
+    const f = document.getElementById('progForm');
+    f.action = BASE_URL; f.reset();
+    openModal('formModal');
+  }
+  function openEdit(r) {
+    document.getElementById('formTitle').textContent = 'Edit Program Kerja';
+    const f = document.getElementById('progForm');
+    f.action = BASE_URL + '/' + r.id + '/edit';
+    f.p_nama.value = r.nama_program || '';
+    f.p_target.value = r.target || '';
+    f.p_status.value = r.status || 'belum';
+    openModal('formModal');
+  }
+</script>
+
+<%- include('../partials/bottom') %>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Daftar Program Kerja - <%= bidang.label %></title>
+  <link rel="stylesheet" href="/css/print.css" />
+  <style>@page { size: A4 portrait; margin: 14mm; }</style>
+</head>
+<body onload="window.print()">
+  <div class="print-toolbar">
+    <button onclick="window.print()">Print / Save PDF</button>
+    <button onclick="window.close()">Tutup</button>
+  </div>
+  <div class="print-header">
+    <div class="org">Paskibra SMA Negeri 1 Jeneponto</div>
+    <div class="doc">Daftar Program Kerja - <%= bidang.label %></div>
+  </div>
+  <hr class="print-rule" />
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">No.</th><th>Nama Program Kerja</th><th>Target</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (rows.length === 0) { %>
+        <tr><td colspan="4" class="text-center">Tidak ada data.</td></tr>
+      <% } %>
+      <% rows.forEach(function(r, i) { %>
+        <tr>
+          <td class="text-center"><%= i + 1 %></td>
+          <td><%= r.nama_program %></td>
+          <td><%= r.target || '-' %></td>
+          <td><%= (statuses.find(s => s.key === r.status) || {}).label || r.status %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</body>
+</html>

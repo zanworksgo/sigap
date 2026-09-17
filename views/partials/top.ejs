@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> · <%= appName %></title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script>
+    // Apply saved theme before paint to avoid flash.
+    (function () { var t = localStorage.getItem('sigap-theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();
+  </script>
+</head>
+<body>
+  <div class="app">
+    <div class="overlay" onclick="closeSidebar()"></div>
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-logo"><img src="/img/logo.png" alt="Logo Paskibra" onerror="this.parentNode.innerHTML='SG'" /></span>
+        <span class="brand-text">
+          <b><%= appName %></b>
+          <span>Paskibra SMAN 1 Jeneponto</span>
+        </span>
+      </div>
+      <nav class="sidebar-nav">
+        <% menu.forEach(function(m) { %>
+          <a href="<%= m.href %>" class="nav-item <%= currentPath.startsWith(m.href) ? 'active' : '' %>" onclick="closeSidebar()">
+            <%- include('icon', { name: m.icon, cls: 'nav-icon' }) %>
+            <span><%= m.label %></span>
+          </a>
+        <% }); %>
+        <% if (typeof menuGroups !== 'undefined' && menuGroups) { menuGroups.forEach(function(g) { %>
+          <div class="nav-group">
+            <div class="nav-group-label">
+              <%- include('icon', { name: g.icon, cls: 'nav-icon' }) %>
+              <span><%= g.label %></span>
+            </div>
+            <% g.items.forEach(function(m) { %>
+              <a href="<%= m.href %>" class="nav-item nav-sub <%= currentPath.startsWith(m.href) ? 'active' : '' %>" onclick="closeSidebar()">
+                <%- include('icon', { name: m.icon, cls: 'nav-icon' }) %>
+                <span><%= m.label %></span>
+              </a>
+            <% }); %>
+          </div>
+        <% }); } %>
+      </nav>
+      <div class="sidebar-user">
+        <div class="user-row">
+          <span class="user-avatar"><%= user.nama.charAt(0) %></span>
+          <div>
+            <div class="user-name"><%= user.nama %></div>
+            <div class="user-role"><%= user.role %></div>
+          </div>
+        </div>
+        <form method="POST" action="/logout" data-noguard>
+          <button type="submit" class="btn btn-sm" style="width:100%;justify-content:center;">
+            <%- include('icon', { name: 'logout', cls: 'nav-icon' }) %> Logout
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+            <%- include('icon', { name: 'menu' }) %>
+          </button>
+          <h1 class="page-title"><%= title %></h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="theme-toggle" onclick="toggleTheme()" aria-label="Ganti tema">
+            <span data-theme-sun><%- include('icon', { name: 'sun' }) %></span>
+            <span data-theme-moon style="display:none"><%- include('icon', { name: 'moon' }) %></span>
+          </button>
+        </div>
+      </header>
+      <main class="content">
+        <% if (typeof flash !== 'undefined' && flash) { %>
+          <div class="toast <%= (typeof flashType !== 'undefined' && flashType === 'error') ? 'error' : '' %>"><%= flash %></div>
+        <% } %>

@@ -1,0 +1,167 @@
+<%- include('../partials/top') %>
+<% const writable = canWrite(mod); %>
+
+<form class="toolbar" method="GET" action="<%= base %>" data-noguard>
+  <div class="grow">
+    <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari nama kegiatan..." />
+  </div>
+  <select name="tahun" onchange="this.form.submit()">
+    <option value="">Semua Tahun</option>
+    <% tahunList.forEach(function(t) { %>
+      <option value="<%= t %>" <%= String(filters.tahun) === String(t) ? 'selected' : '' %>><%= t %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="btn">Cari</button>
+  <div class="toolbar-right">
+    <a class="btn" target="_blank" href="<%= base %>/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
+    </a>
+    <% if (writable) { %>
+      <button type="button" class="btn btn-primary" onclick="openAdd()">
+        <%- include('../partials/icon', { name: 'plus' }) %> Tambah Hasil
+      </button>
+    <% } %>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>No.</th><th>Nama Kegiatan</th><th>Tanggal</th><th>Target</th><th>Hasil</th><th>Penanggung Jawab</th><th class="text-center">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="7" class="empty">Belum ada hasil program kerja.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><b><%= r.nama_kegiatan %></b></td>
+            <td class="nowrap"><%= fmt.formatRentang(r.tanggal_mulai, r.tanggal_selesai) %></td>
+            <td><div class="cell-clamp"><%= r.target || '-' %></div></td>
+            <td><div class="cell-clamp"><%= r.hasil || '-' %></div></td>
+            <td><%= r.penanggung_jawab || '-' %></td>
+            <td>
+              <div class="action-group" style="justify-content:center;">
+                <button class="btn btn-icon btn-sm" title="Detail" onclick='showDetail(<%- JSON.stringify(r.id) %>)'><%- include('../partials/icon', { name: 'eye' }) %></button>
+                <% if (writable) { %>
+                  <button class="btn btn-icon btn-sm" title="Edit" onclick='openEdit(<%- JSON.stringify(r) %>)'><%- include('../partials/icon', { name: 'edit' }) %></button>
+                  <form method="POST" action="<%= base %>/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus hasil program kerja ini?')">
+                    <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% if (writable) { %>
+<div class="modal-backdrop" id="formModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="formTitle">Tambah Hasil Program Kerja</span>
+      <button class="modal-close" onclick="closeModal('formModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <form id="hasilForm" method="POST" action="<%= base %>">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nama Kegiatan <span class="req">*</span></label>
+          <input type="text" name="nama_kegiatan" id="h_nama" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tanggal Mulai <span class="req">*</span></label>
+            <input type="date" name="tanggal_mulai" id="h_mulai" required />
+          </div>
+          <div class="form-group">
+            <label>Tanggal Selesai</label>
+            <input type="date" name="tanggal_selesai" id="h_selesai" />
+            <div class="form-hint">Kosongkan bila kegiatan berlangsung satu hari.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Target</label>
+          <textarea name="target" id="h_target" rows="2" placeholder="Target/sasaran kegiatan..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Hasil</label>
+          <textarea name="hasil" id="h_hasil" rows="2" placeholder="Hasil/capaian kegiatan..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Penanggung Jawab</label>
+          <input type="text" name="penanggung_jawab" id="h_pj" placeholder="Nama penanggung jawab..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('formModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Detail Hasil Program Kerja</span>
+      <button class="modal-close" onclick="closeModal('detailModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <div class="modal-body"><dl class="detail-list" id="detailBody"></dl></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('detailModal')">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+  var BASE_URL = <%- JSON.stringify(base) %>;
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtRange(mulai, selesai) {
+    if (!mulai) return '-';
+    if (!selesai || selesai === mulai) return mulai;
+    return mulai + ' s.d. ' + selesai;
+  }
+  function openAdd() {
+    document.getElementById('formTitle').textContent = 'Tambah Hasil Program Kerja';
+    const f = document.getElementById('hasilForm');
+    f.action = BASE_URL; f.reset();
+    openModal('formModal');
+  }
+  function openEdit(r) {
+    document.getElementById('formTitle').textContent = 'Edit Hasil Program Kerja';
+    const f = document.getElementById('hasilForm');
+    f.action = BASE_URL + '/' + r.id + '/edit';
+    f.h_nama.value = r.nama_kegiatan || '';
+    f.h_mulai.value = r.tanggal_mulai || '';
+    f.h_selesai.value = r.tanggal_selesai || '';
+    f.h_target.value = r.target || '';
+    f.h_hasil.value = r.hasil || '';
+    f.h_pj.value = r.penanggung_jawab || '';
+    openModal('formModal');
+  }
+  async function showDetail(id) {
+    try {
+      const r = await fetchJSON(BASE_URL + '/' + id + '/detail');
+      document.getElementById('detailBody').innerHTML =
+        row('Nama Kegiatan', escapeHtml(r.nama_kegiatan)) +
+        row('Tanggal', escapeHtml(fmtRange(r.tanggal_mulai, r.tanggal_selesai))) +
+        row('Target', escapeHtml(r.target || '-')) +
+        row('Hasil', escapeHtml(r.hasil || '-')) +
+        row('Penanggung Jawab', escapeHtml(r.penanggung_jawab || '-'));
+      openModal('detailModal');
+    } catch (e) { alert(e.message); }
+  }
+  function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+</script>
+
+<%- include('../partials/bottom') %>

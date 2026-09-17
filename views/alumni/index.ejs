@@ -1,0 +1,116 @@
+<%- include('../partials/top') %>
+<% const writable = canWrite('alumni'); %>
+
+<form class="toolbar" method="GET" action="/alumni" data-noguard>
+  <div class="grow">
+    <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari nama alumni..." />
+  </div>
+  <select name="angkatan" onchange="this.form.submit()">
+    <option value="">Semua Angkatan</option>
+    <% angkatanList.forEach(function(a) { %>
+      <option value="<%= a %>" <%= String(filters.angkatan) === String(a) ? 'selected' : '' %>><%= a %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="btn">Cari</button>
+  <div class="toolbar-right">
+    <a class="btn" target="_blank" href="/alumni/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
+    </a>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>No.</th><th>Foto</th><th>Nama</th><th>NRA</th><th>Angkatan</th><th>Kelas Terakhir</th><th>Jabatan Terakhir</th><th>No. HP</th><th class="text-center">Aksi</th></tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="9" class="empty">Belum ada data alumni.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td>
+              <% if (r.foto_path) { %>
+                <a href="/file/<%= r.foto_path %>" target="_blank" title="Lihat foto">
+                  <img class="anggota-thumb" src="/file/<%= r.foto_path %>" alt="Foto <%= r.nama %>" />
+                </a>
+              <% } else { %>
+                <span class="anggota-thumb anggota-thumb-empty"><%= r.nama.charAt(0).toUpperCase() %></span>
+              <% } %>
+            </td>
+            <td><b><%= r.nama %></b></td>
+            <td><%= r.nra || '-' %></td>
+            <td><%= r.angkatan || '-' %></td>
+            <td><%= fmt.formatLast(r.kelas) %></td>
+            <td><%= fmt.formatLast(r.jabatan) %></td>
+            <td class="nowrap"><%= r.no_hp %></td>
+            <td>
+              <div class="action-group" style="justify-content:center;">
+                <button class="btn btn-icon btn-sm" title="Detail" onclick='showDetail(<%- JSON.stringify(r.id) %>)'><%- include('../partials/icon', { name: 'eye' }) %></button>
+                <% if (writable) { %>
+                  <form method="POST" action="/alumni/<%= r.id %>/to-aktif" data-noguard style="display:inline" onsubmit="return confirm('Kembalikan alumni ini menjadi Anggota Aktif?')">
+                    <button class="btn btn-icon btn-sm" title="Jadikan Anggota Aktif"><%- include('../partials/icon', { name: 'user-check' }) %></button>
+                  </form>
+                  <form method="POST" action="/alumni/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus alumni ini?')">
+                    <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Detail Alumni</span>
+      <button class="modal-close" onclick="closeModal('detailModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <div class="modal-body"><dl class="detail-list" id="detailBody"></dl></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('detailModal')">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+  function parseList(v) {
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    try { const a = JSON.parse(v); return Array.isArray(a) ? a : []; }
+    catch (e) { return String(v).split(',').map(function (s) { return s.trim(); }).filter(Boolean); }
+  }
+  function lastOf(v) { const a = parseList(v); return a.length ? a[a.length - 1] : '-'; }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fileLinks(path) {
+    return '<a href="/file/' + path + '" target="_blank">Lihat</a> &middot; ' +
+      '<a href="/file/' + path + '?download=1">Unduh</a>';
+  }
+  async function showDetail(id) {
+    try {
+      const r = await fetchJSON('/alumni/' + id + '/detail');
+      const ttl = [r.tempat_lahir, r.tanggal_lahir].filter(Boolean).join(', ') || '-';
+      let html = '';
+      if (r.foto_path) html += '<div class="detail-photo"><img src="/file/' + r.foto_path + '" alt="Foto"></div>';
+      html += row('Nama Lengkap', r.nama) + row('NRA', r.nra || '-') + row('Tempat, Tgl Lahir', ttl) +
+        row('Angkatan', r.angkatan || '-') + row('Kelas Terakhir', lastOf(r.kelas)) +
+        row('Jabatan Terakhir', lastOf(r.jabatan)) + row('Alamat', r.alamat) + row('No. HP/WA', r.no_hp);
+      if (r.foto_path) html += row('Foto', fileLinks(r.foto_path));
+      if (r.catatan) html += row('Catatan', escapeHtml(r.catatan).replace(/\n/g, '<br>'));
+      document.getElementById('detailBody').innerHTML = html;
+      openModal('detailModal');
+    } catch (e) { alert(e.message); }
+  }
+  function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+</script>
+
+<%- include('../partials/bottom') %>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Data Alumni</title>
+  <link rel="stylesheet" href="/css/print.css" />
+  <style>@page { size: A4 landscape; margin: 12mm; }</style>
+</head>
+<body onload="window.print()">
+  <div class="print-toolbar">
+    <button onclick="window.print()">Print / Save PDF</button>
+    <button onclick="window.close()">Tutup</button>
+  </div>
+  <div class="print-header">
+    <div class="org">Paskibra SMA Negeri 1 Jeneponto</div>
+    <div class="doc">Data Alumni</div>
+  </div>
+  <hr class="print-rule" />
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">No.</th><th>Nama Lengkap</th><th>NRA</th><th>Angkatan</th><th>Tempat, Tgl Lahir</th>
+        <th>Kelas Terakhir</th><th>Jabatan Terakhir</th><th>Alamat</th><th>No. HP/WA</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (rows.length === 0) { %>
+        <tr><td colspan="9" class="text-center">Tidak ada data.</td></tr>
+      <% } %>
+      <% rows.forEach(function(r, i) { %>
+        <tr>
+          <td class="text-center"><%= i + 1 %></td>
+          <td><%= r.nama %></td>
+          <td><%= r.nra || '-' %></td>
+          <td><%= r.angkatan || '-' %></td>
+          <td><%= fmt.formatTTL(r.tempat_lahir, r.tanggal_lahir) %></td>
+          <td><%= fmt.formatLast(r.kelas) %></td>
+          <td><%= fmt.formatLast(r.jabatan) %></td>
+          <td><%= r.alamat %></td>
+          <td><%= r.no_hp %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</body>
+</html>

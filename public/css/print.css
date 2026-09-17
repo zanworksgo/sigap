@@ -1,0 +1,151 @@
+/* Print-specific stylesheet for SIGAP report pages (A4). */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Times New Roman", Georgia, serif;
+  color: #000;
+  background: #fff;
+  font-size: 12pt;
+  padding: 24px;
+}
+
+.print-header {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.print-header .org {
+  font-size: 15pt;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.print-header .doc {
+  font-size: 13pt;
+  font-weight: bold;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.print-header .periode {
+  font-size: 12pt;
+  margin-top: 2px;
+}
+
+.print-rule {
+  border: none;
+  border-top: 2px solid #000;
+  margin: 10px 0 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+th,
+td {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  font-size: 11pt;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #eee;
+  text-align: center;
+  font-weight: bold;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-center {
+  text-center: center;
+  text-align: center;
+}
+
+tfoot td {
+  font-weight: bold;
+}
+
+.print-summary {
+  margin-top: 16px;
+  width: 320px;
+  margin-left: auto;
+}
+
+.print-summary td {
+  border: none;
+  padding: 3px 8px;
+}
+
+.print-summary .total-row td {
+  border-top: 1px solid #000;
+  font-weight: bold;
+}
+
+.print-toolbar {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.print-toolbar button {
+  padding: 8px 14px;
+  border: 1px solid #333;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 11pt;
+  font-family: sans-serif;
+}
+
+.print-sign {
+  margin-top: 40px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.print-sign .box {
+  text-align: center;
+  width: 240px;
+}
+
+.print-sign .space {
+  height: 64px;
+}
+
+@media print {
+  body {
+    padding: 0;
+  }
+
+  .print-toolbar {
+    display: none;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
+
+@media print {
+  .landscape {}
+}
+
+.landscape-page {}
+
+@page landscape {
+  size: A4 landscape;
+}

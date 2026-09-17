@@ -1,0 +1,309 @@
+<%- include('../partials/top') %>
+<% const writable = canWrite('anggota'); %>
+<% const isKeluar = filters.status === 'Keluar'; %>
+
+<form class="toolbar" method="GET" action="/anggota" data-noguard>
+  <div class="grow">
+    <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari nama / NRA anggota..." />
+  </div>
+  <select name="status" onchange="this.form.submit()">
+    <option value="Aktif" <%= isKeluar ? '' : 'selected' %>>Anggota Aktif</option>
+    <option value="Keluar" <%= isKeluar ? 'selected' : '' %>>Sudah Keluar</option>
+  </select>
+  <select name="angkatan" onchange="this.form.submit()">
+    <option value="">Semua Angkatan</option>
+    <% angkatanList.forEach(function(a) { %>
+      <option value="<%= a %>" <%= String(filters.angkatan) === String(a) ? 'selected' : '' %>><%= a %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="btn">Cari</button>
+  <div class="toolbar-right">
+    <a class="btn" target="_blank" href="/anggota/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
+    </a>
+    <% if (writable) { %>
+      <button type="button" class="btn btn-primary" onclick="openAdd()">
+        <%- include('../partials/icon', { name: 'plus' }) %> Tambah Anggota
+      </button>
+    <% } %>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>No.</th><th>Foto</th><th>Nama</th><th>NRA</th><th>Kelas</th><th>Angkatan</th><th>Jabatan</th><th>No. HP</th><% if (isKeluar) { %><th>Bukti Keluar</th><% } %><th class="text-center">Aksi</th></tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="<%= isKeluar ? 10 : 9 %>" class="empty"><%= isKeluar ? 'Tidak ada anggota yang keluar.' : 'Belum ada data anggota.' %></td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td>
+              <% if (r.foto_path) { %>
+                <a href="/file/<%= r.foto_path %>" target="_blank" title="Lihat foto">
+                  <img class="anggota-thumb" src="/file/<%= r.foto_path %>" alt="Foto <%= r.nama %>" />
+                </a>
+              <% } else { %>
+                <span class="anggota-thumb anggota-thumb-empty"><%= r.nama.charAt(0).toUpperCase() %></span>
+              <% } %>
+            </td>
+            <td><b><%= r.nama %></b></td>
+            <td><%= r.nra || '-' %></td>
+            <td><%= fmt.formatList(r.kelas) %></td>
+            <td><%= r.angkatan || '-' %></td>
+            <td><%= fmt.formatList(r.jabatan) %></td>
+            <td class="nowrap"><%= r.no_hp %></td>
+            <% if (isKeluar) { %>
+              <td class="nowrap">
+                <% if (r.keluar_bukti_path) { %>
+                  <a class="btn btn-icon btn-sm" title="Lihat bukti" target="_blank" href="/file/<%= r.keluar_bukti_path %>"><%- include('../partials/icon', { name: 'eye' }) %></a>
+                  <a class="btn btn-icon btn-sm" title="Unduh bukti" href="/file/<%= r.keluar_bukti_path %>?download=1"><%- include('../partials/icon', { name: 'download' }) %></a>
+                <% } else { %> - <% } %>
+              </td>
+            <% } %>
+            <td>
+              <div class="action-group" style="justify-content:center;">
+                <button class="btn btn-icon btn-sm" title="Detail" onclick='showDetail(<%- JSON.stringify(r.id) %>)'><%- include('../partials/icon', { name: 'eye' }) %></button>
+                <% if (writable) { %>
+                  <button class="btn btn-icon btn-sm" title="Edit" onclick='openEdit(<%- JSON.stringify(r) %>)'><%- include('../partials/icon', { name: 'edit' }) %></button>
+                  <% if (isKeluar) { %>
+                    <form method="POST" action="/anggota/<%= r.id %>/to-aktif" data-noguard style="display:inline" onsubmit="return confirm('Aktifkan kembali anggota ini? Bukti keluar akan dihapus.')">
+                      <button class="btn btn-icon btn-sm" title="Aktifkan Kembali"><%- include('../partials/icon', { name: 'user-check' }) %></button>
+                    </form>
+                  <% } else { %>
+                    <form method="POST" action="/anggota/<%= r.id %>/to-alumni" data-noguard style="display:inline" onsubmit="return confirm('Pindahkan anggota ini ke Alumni?')">
+                      <button class="btn btn-icon btn-sm" title="Jadikan Alumni"><%- include('../partials/icon', { name: 'award' }) %></button>
+                    </form>
+                  <% } %>
+                  <form method="POST" action="/anggota/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus anggota ini?')">
+                    <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% if (writable) { %>
+<div class="modal-backdrop" id="formModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="formTitle">Tambah Anggota</span>
+      <button class="modal-close" onclick="closeModal('formModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <form id="anggotaForm" method="POST" action="/anggota" enctype="multipart/form-data">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nama Lengkap <span class="req">*</span></label>
+          <input type="text" name="nama" id="a_nama" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tempat Lahir</label>
+            <input type="text" name="tempat_lahir" id="a_tempat" placeholder="Jeneponto" />
+          </div>
+          <div class="form-group">
+            <label>Tanggal Lahir</label>
+            <input type="date" name="tanggal_lahir" id="a_tgl" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>NRA</label>
+            <input type="text" name="nra" id="a_nra" placeholder="Nomor Registrasi Anggota" />
+          </div>
+          <div class="form-group">
+            <label>Angkatan</label>
+            <input type="number" min="1" step="1" name="angkatan" id="a_angkatan" placeholder="misal: 12" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kelas <span class="req">*</span></label>
+          <div id="kelasList" class="repeat-list"></div>
+          <button type="button" class="btn btn-sm" onclick="addKelas()"><%- include('../partials/icon', { name: 'plus' }) %> Tambah Kelas</button>
+        </div>
+        <div class="form-group">
+          <label>Jabatan <span class="req">*</span></label>
+          <div id="jabatanList" class="repeat-list"></div>
+          <button type="button" class="btn btn-sm" onclick="addJabatan()"><%- include('../partials/icon', { name: 'plus' }) %> Tambah Jabatan</button>
+        </div>
+        <div class="form-group">
+          <label>Alamat Lengkap <span class="req">*</span></label>
+          <textarea name="alamat" id="a_alamat" required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Nomor HP/WhatsApp <span class="req">*</span></label>
+          <input type="text" name="no_hp" id="a_hp" required placeholder="08xxxxxxxxxx" />
+        </div>
+        <div class="form-group">
+          <label>Foto</label>
+          <input type="file" name="foto" id="a_foto" accept="image/*" />
+          <div id="a_foto_current" class="file-current" style="display:none;">
+            Foto saat ini: <a id="a_foto_link" href="#" target="_blank">Lihat</a> &middot; <a id="a_foto_dl" href="#">Unduh</a>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Status <span class="req">*</span></label>
+            <select name="status" id="a_status" required onchange="toggleKeluar()">
+              <option value="Aktif">Aktif</option>
+              <option value="Keluar">Keluar</option>
+            </select>
+          </div>
+          <div class="form-group" id="keluarGroup" style="display:none;">
+            <label>Bukti Keluar (gambar/PDF) <span class="req">*</span></label>
+            <input type="file" name="keluar_bukti" id="a_keluar_bukti" accept="image/*,application/pdf" />
+            <div id="a_bukti_current" class="file-current" style="display:none;">
+              Bukti saat ini: <a id="a_bukti_link" href="#" target="_blank">Lihat</a> &middot; <a id="a_bukti_dl" href="#">Unduh</a>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Catatan <span class="muted">(opsional)</span></label>
+          <textarea name="catatan" id="a_catatan" placeholder="Catatan tambahan tentang anggota ini..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('formModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Detail Anggota</span>
+      <button class="modal-close" onclick="closeModal('detailModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <div class="modal-body"><dl class="detail-list" id="detailBody"></dl></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('detailModal')">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+  function parseList(v) {
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    try { const a = JSON.parse(v); return Array.isArray(a) ? a : []; }
+    catch (e) { return String(v).split(',').map(function (s) { return s.trim(); }).filter(Boolean); }
+  }
+  function repeatRow(name, value) {
+    const wrap = document.createElement('div');
+    wrap.className = 'repeat-row';
+    const input = document.createElement('input');
+    input.type = 'text'; input.name = name + '[]'; input.value = value || '';
+    input.placeholder = name === 'kelas' ? 'misal: XII IPA 1' : 'misal: Ketua Umum';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn btn-icon btn-sm btn-danger'; btn.title = 'Hapus';
+    btn.textContent = '\u00D7';
+    btn.onclick = function () { wrap.remove(); };
+    wrap.appendChild(input); wrap.appendChild(btn);
+    return wrap;
+  }
+  function addKelas(value) { document.getElementById('kelasList').appendChild(repeatRow('kelas', value)); }
+  function addJabatan(value) { document.getElementById('jabatanList').appendChild(repeatRow('jabatan', value)); }
+  function fillList(containerId, adder, values) {
+    document.getElementById(containerId).innerHTML = '';
+    if (values.length === 0) { adder(''); return; }
+    values.forEach(function (v) { adder(v); });
+  }
+
+  function toggleKeluar() {
+    const st = document.getElementById('a_status').value;
+    const grp = document.getElementById('keluarGroup');
+    const inp = document.getElementById('a_keluar_bukti');
+    const hasCurrent = document.getElementById('a_bukti_current').style.display !== 'none';
+    if (st === 'Keluar') { grp.style.display = ''; inp.required = !hasCurrent; }
+    else { grp.style.display = 'none'; inp.required = false; inp.value = ''; }
+  }
+
+  function openAdd() {
+    document.getElementById('formTitle').textContent = 'Tambah Anggota';
+    const f = document.getElementById('anggotaForm');
+    f.action = '/anggota'; f.reset();
+    fillList('kelasList', addKelas, []);
+    fillList('jabatanList', addJabatan, []);
+    document.getElementById('a_foto_current').style.display = 'none';
+    document.getElementById('a_bukti_current').style.display = 'none';
+    document.getElementById('a_status').value = 'Aktif';
+    toggleKeluar();
+    openModal('formModal');
+  }
+  function openEdit(r) {
+    document.getElementById('formTitle').textContent = 'Edit Anggota';
+    const f = document.getElementById('anggotaForm');
+    f.action = '/anggota/' + r.id + '/edit'; f.reset();
+    f.a_nama.value = r.nama; f.a_tempat.value = r.tempat_lahir || '';
+    f.a_tgl.value = r.tanggal_lahir || ''; f.a_nra.value = r.nra || '';
+    f.a_angkatan.value = r.angkatan || ''; f.a_alamat.value = r.alamat; f.a_hp.value = r.no_hp;
+    f.a_catatan.value = r.catatan || '';
+    fillList('kelasList', addKelas, parseList(r.kelas));
+    fillList('jabatanList', addJabatan, parseList(r.jabatan));
+
+    const fc = document.getElementById('a_foto_current');
+    if (r.foto_path) {
+      document.getElementById('a_foto_link').href = '/file/' + r.foto_path;
+      document.getElementById('a_foto_dl').href = '/file/' + r.foto_path + '?download=1';
+      fc.style.display = '';
+    } else { fc.style.display = 'none'; }
+
+    const bc = document.getElementById('a_bukti_current');
+    if (r.keluar_bukti_path) {
+      document.getElementById('a_bukti_link').href = '/file/' + r.keluar_bukti_path;
+      document.getElementById('a_bukti_dl').href = '/file/' + r.keluar_bukti_path + '?download=1';
+      bc.style.display = '';
+    } else { bc.style.display = 'none'; }
+
+    document.getElementById('a_status').value = r.status === 'Keluar' ? 'Keluar' : 'Aktif';
+    toggleKeluar();
+    openModal('formModal');
+  }
+  async function showDetail(id) {
+    try {
+      const r = await fetchJSON('/anggota/' + id + '/detail');
+      const ttl = [r.tempat_lahir, r.tanggal_lahir].filter(Boolean).join(', ') || '-';
+      const kelas = parseList(r.kelas).join(', ') || '-';
+      const jabatan = parseList(r.jabatan).join(', ') || '-';
+      let html = '';
+      if (r.foto_path) html += '<div class="detail-photo"><img src="/file/' + r.foto_path + '" alt="Foto"></div>';
+      html += row('Nama Lengkap', r.nama) + row('NRA', r.nra || '-') + row('Tempat, Tgl Lahir', ttl) +
+        row('Kelas', kelas) + row('Alamat', r.alamat) + row('No. HP/WA', r.no_hp) +
+        row('Angkatan', r.angkatan || '-') + row('Jabatan', jabatan) + row('Status', r.status);
+      if (r.foto_path) {
+        html += row('Foto', fileLinks(r.foto_path));
+      }
+      if (r.status === 'Keluar' && r.keluar_bukti_path) {
+        html += row('Bukti Keluar', fileLinks(r.keluar_bukti_path));
+      }
+      if (r.catatan) {
+        html += row('Catatan', escapeHtml(r.catatan).replace(/\n/g, '<br>'));
+      }
+      document.getElementById('detailBody').innerHTML = html;
+      openModal('detailModal');
+    } catch (e) { alert(e.message); }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fileLinks(path) {
+    return '<a href="/file/' + path + '" target="_blank">Lihat</a> &middot; ' +
+      '<a href="/file/' + path + '?download=1">Unduh</a>';
+  }
+  function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+</script>
+
+<%- include('../partials/bottom') %>
+

@@ -1,0 +1,158 @@
+<%- include('../partials/top') %>
+<% const writable = canWrite('surat_keluar'); %>
+
+<form class="toolbar" method="GET" action="/surat-keluar" data-noguard>
+  <div class="grow">
+    <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari nomor, perihal, tujuan..." />
+  </div>
+  <select name="bulan" onchange="this.form.submit()">
+    <option value="">Semua Bulan</option>
+    <% fmt.MONTHS.forEach(function(m, i) { %>
+      <option value="<%= i + 1 %>" <%= String(filters.bulan) === String(i + 1) ? 'selected' : '' %>><%= m %></option>
+    <% }); %>
+  </select>
+  <select name="tahun" onchange="this.form.submit()">
+    <option value="">Semua Tahun</option>
+    <% for (let y = new Date().getFullYear(); y >= 2020; y--) { %>
+      <option value="<%= y %>" <%= String(filters.tahun) === String(y) ? 'selected' : '' %>><%= y %></option>
+    <% } %>
+  </select>
+  <button type="submit" class="btn">Cari</button>
+  <div class="toolbar-right">
+    <a class="btn" target="_blank" href="/surat-keluar/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
+    </a>
+    <% if (writable) { %>
+      <button type="button" class="btn btn-primary" onclick="openAdd()">
+        <%- include('../partials/icon', { name: 'plus' }) %> Tambah Surat
+      </button>
+    <% } %>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>No.</th><th>Nomor Surat</th><th>Tanggal</th><th>Perihal</th><th>Ditujukan</th><th>File</th><th class="text-center">Aksi</th></tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="7" class="empty">Belum ada data surat keluar.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><span class="badge badge-primary"><%= r.nomor_surat %></span></td>
+            <td class="nowrap"><%= fmt.formatTanggal(r.tanggal) %></td>
+            <td><%= r.perihal %></td>
+            <td><%= r.ditujukan %></td>
+            <td>
+              <% if (r.file_path) { %>
+                <div class="action-group">
+                  <a class="btn btn-icon btn-sm" title="Preview" target="_blank" href="/file/<%= r.file_path %>"><%- include('../partials/icon', { name: 'eye' }) %></a>
+                  <a class="btn btn-icon btn-sm" title="Download" href="/file/<%= r.file_path %>?download=1"><%- include('../partials/icon', { name: 'download' }) %></a>
+                </div>
+              <% } else { %><span class="muted">-</span><% } %>
+            </td>
+            <td>
+              <div class="action-group" style="justify-content:center;">
+                <button class="btn btn-icon btn-sm" title="Detail" onclick='showDetail(<%- JSON.stringify(r.id) %>)'><%- include('../partials/icon', { name: 'eye' }) %></button>
+                <% if (writable) { %>
+                  <button class="btn btn-icon btn-sm" title="Edit" onclick='openEdit(<%- JSON.stringify(r) %>)'><%- include('../partials/icon', { name: 'edit' }) %></button>
+                  <form method="POST" action="/surat-keluar/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Arsipkan surat ini?')">
+                    <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% if (writable) { %>
+<div class="modal-backdrop" id="formModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="formTitle">Tambah Surat Keluar</span>
+      <button class="modal-close" onclick="closeModal('formModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <form id="suratForm" method="POST" action="/surat-keluar" enctype="multipart/form-data">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nomor Surat <span class="req">*</span></label>
+            <input type="text" name="nomor_surat" id="f_nomor" required />
+            <div class="form-hint">Harus unik.</div>
+          </div>
+          <div class="form-group">
+            <label>Tanggal <span class="req">*</span></label>
+            <input type="date" name="tanggal" id="f_tanggal" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Perihal <span class="req">*</span></label>
+          <input type="text" name="perihal" id="f_perihal" required />
+        </div>
+        <div class="form-group">
+          <label>Ditujukan Kepada <span class="req">*</span></label>
+          <input type="text" name="ditujukan" id="f_ditujukan" required />
+        </div>
+        <div class="form-group">
+          <label>File Surat (PDF)</label>
+          <input type="file" name="file" accept="application/pdf" />
+          <div class="form-hint">Hanya PDF, maksimal 5 MB. Kosongkan jika tidak mengubah file.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('formModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Detail Surat Keluar</span>
+      <button class="modal-close" onclick="closeModal('detailModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <div class="modal-body"><dl class="detail-list" id="detailBody"></dl></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('detailModal')">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+  function openAdd() {
+    document.getElementById('formTitle').textContent = 'Tambah Surat Keluar';
+    const f = document.getElementById('suratForm');
+    f.action = '/surat-keluar'; f.reset();
+    openModal('formModal');
+  }
+  function openEdit(r) {
+    document.getElementById('formTitle').textContent = 'Edit Surat Keluar';
+    const f = document.getElementById('suratForm');
+    f.action = '/surat-keluar/' + r.id + '/edit';
+    f.f_nomor.value = r.nomor_surat; f.f_tanggal.value = r.tanggal;
+    f.f_perihal.value = r.perihal; f.f_ditujukan.value = r.ditujukan;
+    openModal('formModal');
+  }
+  async function showDetail(id) {
+    try {
+      const r = await fetchJSON('/surat-keluar/' + id + '/detail');
+      let html = row('Nomor Surat', r.nomor_surat) + row('Tanggal', r.tanggal) +
+        row('Perihal', r.perihal) + row('Ditujukan', r.ditujukan);
+      if (r.file_path) html += row('File', '<a target="_blank" href="/file/' + r.file_path + '">Lihat PDF</a>');
+      document.getElementById('detailBody').innerHTML = html;
+      openModal('detailModal');
+    } catch (e) { alert(e.message); }
+  }
+  function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+</script>
+
+<%- include('../partials/bottom') %>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> · <%= appName %></title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script>(function () { var t = localStorage.getItem('sigap-theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();</script>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-logo"><img src="/img/logo.png" alt="Logo Paskibra" onerror="this.parentNode.innerHTML='SG'" /></div>
+        <div class="login-title"><%= appName %></div>
+        <div class="login-sub"><%= appLong %></div>
+        <div class="login-sub"><%= org %></div>
+      </div>
+
+      <% if (error) { %>
+        <div class="toast error" style="position:static;max-width:none;margin-bottom:16px;"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label for="identifier">Username atau Email <span class="req">*</span></label>
+          <input type="text" id="identifier" name="identifier" value="<%= values.identifier || '' %>" required autofocus autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="password">Password <span class="req">*</span></label>
+          <div class="pw-wrap">
+            <input type="password" id="password" name="password" required autocomplete="current-password" />
+            <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Tampilkan/sembunyikan password">
+              <span data-pw-show><%- include('partials/icon', { name: 'eye' }) %></span>
+              <span data-pw-hide style="display:none"><%- include('partials/icon', { name: 'eye-off' }) %></span>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Masuk</button>
+      </form>
+
+      <div class="help-cred"><%- copyright %></div>
+    </div>
+  </div>
+  <script src="/js/main.js"></script>
+  <script>
+    function togglePw() {
+      var input = document.getElementById('password');
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      document.querySelector('[data-pw-show]').style.display = show ? 'none' : '';
+      document.querySelector('[data-pw-hide]').style.display = show ? '' : 'none';
+    }
+  </script>
+  <% if (typeof liveReload !== 'undefined' && liveReload) { %>
+    <script>document.write('<script src="//' + location.hostname + ':35729/livereload.js?snipver=1"><\/script>');</script>
+  <% } %>
+</body>
+</html>

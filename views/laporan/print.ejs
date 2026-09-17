@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Laporan Keuangan</title>
+  <link rel="stylesheet" href="/css/print.css" />
+</head>
+<body onload="window.print()">
+  <div class="print-toolbar">
+    <button onclick="window.print()">Print / Save PDF</button>
+    <button onclick="window.close()">Tutup</button>
+  </div>
+  <div class="print-header">
+    <div class="doc" style="font-size:15pt;">Laporan Keuangan</div>
+    <div class="org">Paskibra SMA Negeri 1 Jeneponto</div>
+    <div class="periode">Periode: <%= fmt.periodeLabel(filters.bulan, filters.tahun) %></div>
+  </div>
+  <hr class="print-rule" />
+  <table>
+    <thead>
+      <tr><th style="width:36px">No.</th><th>Tanggal</th><th>Uraian</th><th class="text-right">Pemasukan</th><th class="text-right">Pengeluaran</th></tr>
+    </thead>
+    <tbody>
+      <% if (rows.length === 0) { %>
+        <tr><td colspan="5" class="text-center">Tidak ada transaksi.</td></tr>
+      <% } %>
+      <% rows.forEach(function(r, i) { %>
+        <tr>
+          <td class="text-center"><%= i + 1 %></td>
+          <td><%= fmt.formatTanggal(r.tanggal) %></td>
+          <td><%= r.uraian %></td>
+          <td class="text-right"><%= r.jenis === 'Pemasukan' ? fmt.formatRupiah(r.nominal) : '-' %></td>
+          <td class="text-right"><%= r.jenis === 'Pengeluaran' ? fmt.formatRupiah(r.nominal) : '-' %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <table class="print-summary">
+    <tr><td>Total Pemasukan</td><td class="text-right"><%= fmt.formatRupiah(totalMasuk) %></td></tr>
+    <tr><td>Total Pengeluaran</td><td class="text-right"><%= fmt.formatRupiah(totalKeluar) %></td></tr>
+    <tr class="total-row"><td>Saldo</td><td class="text-right"><%= fmt.formatRupiah(saldo) %></td></tr>
+  </table>
+
+  <div class="print-sign">
+    <div class="box">
+      <div>Jeneponto, <%= fmt.formatTanggal(new Date().toISOString().slice(0,10)) %></div>
+      <div>Bendahara</div>
+      <div class="space"></div>
+      <div>( ........................................ )</div>
+    </div>
+  </div>
+</body>
+</html>

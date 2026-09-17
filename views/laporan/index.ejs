@@ -1,0 +1,71 @@
+<%- include('../partials/top') %>
+
+<form class="toolbar" method="GET" action="/laporan" data-noguard>
+  <select name="bulan" onchange="this.form.submit()">
+    <option value="">Semua Bulan</option>
+    <% fmt.MONTHS.forEach(function(m, i) { %>
+      <option value="<%= i + 1 %>" <%= String(filters.bulan) === String(i + 1) ? 'selected' : '' %>><%= m %></option>
+    <% }); %>
+  </select>
+  <select name="tahun" onchange="this.form.submit()">
+    <option value="">Semua Tahun</option>
+    <% for (let y = new Date().getFullYear(); y >= 2020; y--) { %>
+      <option value="<%= y %>" <%= String(filters.tahun) === String(y) ? 'selected' : '' %>><%= y %></option>
+    <% } %>
+  </select>
+  <button type="submit" class="btn">Terapkan</button>
+  <div class="toolbar-right">
+    <a class="btn btn-primary" target="_blank" href="/laporan/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Laporan
+    </a>
+  </div>
+</form>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+  <div class="stat-card">
+    <div class="stat-label">Total Pemasukan</div>
+    <div class="stat-value" style="font-size:19px;color:var(--success);"><%= fmt.formatRupiah(totalMasuk) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Pengeluaran</div>
+    <div class="stat-value" style="font-size:19px;color:var(--danger);"><%= fmt.formatRupiah(totalKeluar) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Saldo</div>
+    <div class="stat-value" style="font-size:19px;color:var(--primary);"><%= fmt.formatRupiah(saldo) %></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Rincian Transaksi · <%= fmt.periodeLabel(filters.bulan, filters.tahun) %></span></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>No.</th><th>Tanggal</th><th>Uraian</th><th class="text-right">Pemasukan</th><th class="text-right">Pengeluaran</th></tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="5" class="empty">Belum ada transaksi.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td class="nowrap"><%= fmt.formatTanggal(r.tanggal) %></td>
+            <td><%= r.uraian %></td>
+            <td class="text-right mono"><%= r.jenis === 'Pemasukan' ? fmt.formatRupiah(r.nominal) : '-' %></td>
+            <td class="text-right mono"><%= r.jenis === 'Pengeluaran' ? fmt.formatRupiah(r.nominal) : '-' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" class="text-right"><b>Total</b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(totalMasuk) %></b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(totalKeluar) %></b></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/bottom') %>

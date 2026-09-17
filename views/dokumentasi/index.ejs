@@ -1,0 +1,152 @@
+<%- include('../partials/top') %>
+<% const writable = canWrite('dokumentasi'); %>
+
+<form class="toolbar" method="GET" action="/dokumentasi" data-noguard>
+  <div class="grow">
+    <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari nama kegiatan..." />
+  </div>
+  <select name="tahun" onchange="this.form.submit()">
+    <option value="">Semua Tahun</option>
+    <% tahunList.forEach(function(t) { %>
+      <option value="<%= t %>" <%= String(filters.tahun) === String(t) ? 'selected' : '' %>><%= t %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="btn">Cari</button>
+  <div class="toolbar-right">
+    <a class="btn" target="_blank" href="/dokumentasi/print?<%= new URLSearchParams(filters).toString() %>">
+      <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
+    </a>
+    <% if (writable) { %>
+      <button type="button" class="btn btn-primary" onclick="openAdd()">
+        <%- include('../partials/icon', { name: 'plus' }) %> Tambah Dokumentasi
+      </button>
+    <% } %>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>No.</th><th>Nama Kegiatan</th><th>Tanggal Pelaksanaan</th><th>Link Google Drive</th><th class="text-center">Aksi</th></tr>
+      </thead>
+      <tbody>
+        <% if (rows.length === 0) { %>
+          <tr><td colspan="5" class="empty">Belum ada data dokumentasi.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><b><%= r.nama_kegiatan %></b></td>
+            <td class="nowrap"><%= fmt.formatTanggal(r.tanggal) %></td>
+            <td>
+              <div class="action-group">
+                <a class="btn btn-icon btn-sm" title="Buka link" target="_blank" rel="noopener noreferrer" href="<%= r.link %>"><%- include('../partials/icon', { name: 'send' }) %></a>
+                <button class="btn btn-icon btn-sm" title="Salin link" onclick='copyLink(<%- JSON.stringify(r.link) %>, this)'><%- include('../partials/icon', { name: 'paperclip' }) %></button>
+              </div>
+            </td>
+            <td>
+              <div class="action-group" style="justify-content:center;">
+                <button class="btn btn-icon btn-sm" title="Detail" onclick='showDetail(<%- JSON.stringify(r.id) %>)'><%- include('../partials/icon', { name: 'eye' }) %></button>
+                <% if (writable) { %>
+                  <button class="btn btn-icon btn-sm" title="Edit" onclick='openEdit(<%- JSON.stringify(r) %>)'><%- include('../partials/icon', { name: 'edit' }) %></button>
+                  <form method="POST" action="/dokumentasi/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus dokumentasi ini?')">
+                    <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% if (writable) { %>
+<div class="modal-backdrop" id="formModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="formTitle">Tambah Dokumentasi</span>
+      <button class="modal-close" onclick="closeModal('formModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <form id="dokForm" method="POST" action="/dokumentasi">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Nama Kegiatan <span class="req">*</span></label>
+          <input type="text" name="nama_kegiatan" id="d_nama" required />
+        </div>
+        <div class="form-group">
+          <label>Tanggal Pelaksanaan <span class="req">*</span></label>
+          <input type="date" name="tanggal" id="d_tanggal" required />
+        </div>
+        <div class="form-group">
+          <label>Link Google Drive <span class="req">*</span></label>
+          <input type="url" name="link" id="d_link" required placeholder="https://drive.google.com/..." />
+          <div class="file-current">Hanya menyimpan link akses foto, bukan filenya.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal('formModal')">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Detail Dokumentasi</span>
+      <button class="modal-close" onclick="closeModal('detailModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
+    </div>
+    <div class="modal-body"><dl class="detail-list" id="detailBody"></dl></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('detailModal')">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function copyLink(link, btn) {
+    navigator.clipboard.writeText(link).then(function () {
+      const orig = btn.title;
+      btn.title = 'Tersalin!';
+      btn.classList.add('btn-primary');
+      setTimeout(function () { btn.title = orig; btn.classList.remove('btn-primary'); }, 1500);
+    }).catch(function () { alert('Gagal menyalin link.'); });
+  }
+  function openAdd() {
+    document.getElementById('formTitle').textContent = 'Tambah Dokumentasi';
+    const f = document.getElementById('dokForm');
+    f.action = '/dokumentasi'; f.reset();
+    openModal('formModal');
+  }
+  function openEdit(r) {
+    document.getElementById('formTitle').textContent = 'Edit Dokumentasi';
+    const f = document.getElementById('dokForm');
+    f.action = '/dokumentasi/' + r.id + '/edit';
+    f.d_nama.value = r.nama_kegiatan;
+    f.d_tanggal.value = r.tanggal || '';
+    f.d_link.value = r.link || '';
+    openModal('formModal');
+  }
+  async function showDetail(id) {
+    try {
+      const r = await fetchJSON('/dokumentasi/' + id + '/detail');
+      const link = escapeHtml(r.link);
+      document.getElementById('detailBody').innerHTML =
+        row('Nama Kegiatan', escapeHtml(r.nama_kegiatan)) +
+        row('Tanggal Pelaksanaan', escapeHtml(r.tanggal || '-')) +
+        row('Link Google Drive', '<a href="' + link + '" target="_blank" rel="noopener noreferrer">' + link + '</a>');
+      openModal('detailModal');
+    } catch (e) { alert(e.message); }
+  }
+  function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+</script>
+
+<%- include('../partials/bottom') %>

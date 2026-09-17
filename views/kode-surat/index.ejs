@@ -1,0 +1,40 @@
+<%- include('../partials/top') %>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">a. Penomoran Surat</span></div>
+  <div class="card-body">
+    <p class="muted" style="margin-bottom:14px;">Contoh penomoran surat:</p>
+    <div style="font-size:20px;font-weight:800;letter-spacing:0.5px;color:var(--primary);margin-bottom:18px;word-break:break-all;">
+      <%= penomoran.contoh %>
+    </div>
+    <p class="muted" style="margin-bottom:14px;">Contoh penomoran surat di atas diperuntukkan Paskibra Sekolah dengan keterangan:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th style="width:120px">Bagian</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <% penomoran.bagian.forEach(function(b) { %>
+            <tr><td><span class="badge badge-primary"><%= b.kode %></span></td><td><%= b.keterangan %></td></tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header"><span class="card-title">b. Kode Surat</span></div>
+  <div class="card-body">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th style="width:120px">Kode</th><th>Keterangan</th></tr></thead>
+        <tbody>
+          <% kode.forEach(function(k) { %>
+            <tr><td><span class="badge badge-primary"><%= k.kode %></span></td><td><%= k.keterangan %></td></tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/bottom') %>

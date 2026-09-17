@@ -1,0 +1,31 @@
+{
+  "name": "sigap-pasmansa",
+  "version": "1.0.0",
+  "description": "SIGAP - Sistem Informasi dan Gerbang Administrasi Paskibra SMA Negeri 1 Jeneponto",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node db/seed.js"
+  },
+  "keywords": [
+    "sigap",
+    "paskibra",
+    "administrasi"
+  ],
+  "author": "Farhan",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "connect-sqlite3": "^0.9.15",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "livereload": "^0.10.3"
+  }
+}

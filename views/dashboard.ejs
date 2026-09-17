@@ -1,0 +1,140 @@
+<%- include('partials/top') %>
+
+<div class="stat-grid">
+  <% if (canAccess('surat_masuk')) { %>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'inbox' }) %></div>
+      <div class="stat-label">Surat Masuk Bulan Ini</div>
+      <div class="stat-value"><%= stats.suratMasukBulan %></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'inbox' }) %></div>
+      <div class="stat-label">Total Surat Masuk</div>
+      <div class="stat-value"><%= stats.suratMasukTotal %></div>
+    </div>
+  <% } %>
+  <% if (canAccess('surat_keluar')) { %>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'send' }) %></div>
+      <div class="stat-label">Surat Keluar Bulan Ini</div>
+      <div class="stat-value"><%= stats.suratKeluarBulan %></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'send' }) %></div>
+      <div class="stat-label">Total Surat Keluar</div>
+      <div class="stat-value"><%= stats.suratKeluarTotal %></div>
+    </div>
+  <% } %>
+  <% if (canAccess('pemasukan')) { %>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'trending-up' }) %></div>
+      <div class="stat-label">Pemasukan Bulan Ini</div>
+      <div class="stat-value" style="font-size:19px;"><%= fmt.formatRupiah(stats.pemasukanBulan) %></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'trending-down' }) %></div>
+      <div class="stat-label">Pengeluaran Bulan Ini</div>
+      <div class="stat-value" style="font-size:19px;"><%= fmt.formatRupiah(stats.pengeluaranBulan) %></div>
+    </div>
+  <% } %>
+  <% if (canAccess('laporan') || canAccess('pemasukan')) { %>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'wallet' }) %></div>
+      <div class="stat-label">Saldo</div>
+      <div class="stat-value" style="font-size:19px;color:var(--primary);"><%= fmt.formatRupiah(stats.saldo) %></div>
+    </div>
+  <% } %>
+  <% if (canAccess('anggota')) { %>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'user-check' }) %></div>
+      <div class="stat-label">Jumlah Anggota Aktif</div>
+      <div class="stat-value"><%= stats.anggotaAktif %></div>
+    </div>
+  <% } %>
+  <% if (canAccess('alumni')) { %>
+    <div class="stat-card">
+      <div class="stat-icon"><%- include('partials/icon', { name: 'award' }) %></div>
+      <div class="stat-label">Jumlah Alumni</div>
+      <div class="stat-value"><%= stats.alumni %></div>
+    </div>
+  <% } %>
+</div>
+
+<% if (typeof programStats !== 'undefined' && programStats.length) { %>
+  <% programStats.forEach(function(ps) { %>
+    <div class="card mt-3">
+      <div class="card-header"><span class="card-title">Program Kerja · <%= ps.label %></span></div>
+      <div class="card-body">
+        <div class="stat-grid" style="margin-bottom:0;">
+          <div class="stat-card">
+            <div class="stat-icon"><%- include('partials/icon', { name: 'grid' }) %></div>
+            <div class="stat-label">Total</div>
+            <div class="stat-value"><%= ps.total %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><%- include('partials/icon', { name: 'award' }) %></div>
+            <div class="stat-label">Terlaksana</div>
+            <div class="stat-value" style="color:var(--success);"><%= ps.terlaksana %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><%- include('partials/icon', { name: 'file-text' }) %></div>
+            <div class="stat-label">Belum Terlaksana</div>
+            <div class="stat-value" style="color:var(--danger);"><%= ps.tidakTerlaksana %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% }); %>
+<% } %>
+
+<% if (canAccess('surat_masuk')) { %>
+<div class="card mt-3">
+  <div class="card-header"><span class="card-title">Surat Masuk Terbaru</span>
+    <a href="/surat-masuk" class="btn btn-sm">Lihat Semua</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tanggal</th><th>Nomor Surat</th><th>Asal</th><th>Perihal</th></tr></thead>
+      <tbody>
+        <% if (suratTerbaru.length === 0) { %>
+          <tr><td colspan="4" class="text-center muted">Belum ada data.</td></tr>
+        <% } %>
+        <% suratTerbaru.forEach(function(s) { %>
+          <tr>
+            <td class="nowrap"><%= fmt.formatTanggal(s.tanggal_masuk) %></td>
+            <td><%= s.nomor_surat %></td>
+            <td><%= s.asal_surat %></td>
+            <td><%= s.perihal %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<% if (canAccess('pemasukan') || canAccess('laporan')) { %>
+<div class="card mt-3">
+  <div class="card-header"><span class="card-title">Transaksi Terbaru</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tanggal</th><th>Uraian</th><th>Jenis</th><th class="text-right">Nominal</th></tr></thead>
+      <tbody>
+        <% if (transaksiTerbaru.length === 0) { %>
+          <tr><td colspan="4" class="text-center muted">Belum ada data.</td></tr>
+        <% } %>
+        <% transaksiTerbaru.forEach(function(t) { %>
+          <tr>
+            <td class="nowrap"><%= fmt.formatTanggal(t.tanggal) %></td>
+            <td><%= t.uraian %></td>
+            <td><span class="badge <%= t.jenis === 'Pemasukan' ? 'badge-success' : 'badge-danger' %>"><%= t.jenis %></span></td>
+            <td class="text-right mono"><%= fmt.formatRupiah(t.nominal) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<%- include('partials/bottom') %>
