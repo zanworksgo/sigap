@@ -12,6 +12,7 @@ const MODULES = {
   surat_masuk: 'Surat Masuk',
   surat_keluar: 'Surat Keluar',
   kode_surat: 'Aturan Surat',
+  surat_panitia: 'Surat Kepanitiaan',
   anggota: 'Data Anggota Aktif',
   alumni: 'Data Alumni',
   dokumentasi: 'Dokumentasi',
@@ -24,17 +25,17 @@ const MODULES = {
 // write:  modules a role may CREATE/UPDATE/DELETE.
 const ROLE_ACCESS = {
   Admin: {
-    access: ['dashboard', 'users', 'surat_masuk', 'surat_keluar', 'kode_surat', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan'],
-    write: ['users', 'surat_masuk', 'surat_keluar', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran']
+    access: ['dashboard', 'users', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan'],
+    write: ['users', 'surat_masuk', 'surat_keluar', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran']
   },
   'Ketua Umum': {
     // Read-only monitoring across all administrative modules, grouped per jabatan.
-    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan'],
+    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan'],
     write: []
   },
   Sekretaris: {
-    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat'],
-    write: ['surat_masuk', 'surat_keluar']
+    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia'],
+    write: ['surat_masuk', 'surat_keluar', 'surat_panitia']
   },
   Humas: {
     access: ['dashboard', 'anggota', 'alumni', 'dokumentasi'],
@@ -50,7 +51,7 @@ const ROLE_ACCESS = {
 // Each group lists the MENU keys the jabatan manages.
 const JABATAN_GROUPS = [
   { key: 'sekretaris', label: 'Sekretaris', icon: 'send', modules: ['surat_masuk', 'surat_keluar', 'kode_surat'] },
-  { key: 'humas', label: 'Bidang Hubungan Masyarakat', icon: 'user-check', modules: ['anggota', 'alumni', 'dokumentasi'] },
+  { key: 'humas', label: 'Humas', icon: 'user-check', modules: ['anggota', 'alumni', 'dokumentasi'] },
   { key: 'bendahara', label: 'Bendahara', icon: 'wallet', modules: ['pemasukan', 'pengeluaran', 'laporan'] }
 ];
 

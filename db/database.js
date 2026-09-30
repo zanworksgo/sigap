@@ -51,6 +51,39 @@ function init() {
 
     CREATE TABLE IF NOT EXISTS surat_keluar (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nomor_surat TEXT NOT NULL UNIQUE,
+      perihal TEXT NOT NULL,
+      ditujukan TEXT NOT NULL,
+      tanggal TEXT NOT NULL,
+      file_path TEXT,
+      file_original TEXT,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      deleted_at TEXT,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS surat_masuk_panitia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kepanitiaan TEXT NOT NULL,
+      nomor_surat TEXT NOT NULL,
+      tanggal_masuk TEXT NOT NULL,
+      asal_surat TEXT NOT NULL,
+      perihal TEXT NOT NULL,
+      penerima TEXT NOT NULL,
+      file_path TEXT,
+      file_original TEXT,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      deleted_at TEXT,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS surat_keluar_panitia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kepanitiaan TEXT NOT NULL,
       nomor_surat TEXT NOT NULL,
       perihal TEXT NOT NULL,
       ditujukan TEXT NOT NULL,
@@ -63,6 +96,10 @@ function init() {
       deleted_at TEXT,
       FOREIGN KEY (created_by) REFERENCES users(id)
     );
+
+    -- Nomor surat keluar kepanitiaan unik per kepanitiaan (soft-delete aware).
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_surat_keluar_panitia_nomor
+      ON surat_keluar_panitia (kepanitiaan, nomor_surat) WHERE deleted_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS anggota (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,11 +185,6 @@ function init() {
   `);
 
   migrate();
-
-  // Enforce nomor_surat uniqueness only among non-deleted rows (soft-delete aware).
-  db.exec(
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_surat_keluar_nomor_active ON surat_keluar(nomor_surat) WHERE deleted_at IS NULL'
-  );
 }
 
 // Lightweight schema migrations for databases created before a change.
@@ -160,7 +192,6 @@ function migrate() {
   migrateUserRoles();
   migrateProgramTables();
   migrateAnggota();
-  migrateSuratKeluar();
 
   // Optional per-member note added after the anggota rebuild.
   const anggotaCols = db.prepare('PRAGMA table_info(anggota)').all();
@@ -198,39 +229,6 @@ function migrate() {
     });
     rebuild();
   }
-}
-
-// Rebuild surat_keluar to drop the legacy column-level UNIQUE on nomor_surat,
-// which clashed with soft-delete (a reused number of a deleted row was rejected).
-// Uniqueness is enforced instead by a partial unique index on active rows.
-function migrateSuratKeluar() {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='surat_keluar'").get();
-  if (!row || !row.sql || !/nomor_surat\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(row.sql)) return;
-  const rebuild = db.transaction(() => {
-    db.exec(`
-      CREATE TABLE surat_keluar_new (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nomor_surat TEXT NOT NULL,
-        perihal TEXT NOT NULL,
-        ditujukan TEXT NOT NULL,
-        tanggal TEXT NOT NULL,
-        file_path TEXT,
-        file_original TEXT,
-        created_by INTEGER,
-        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-        deleted_at TEXT,
-        FOREIGN KEY (created_by) REFERENCES users(id)
-      );
-      INSERT INTO surat_keluar_new
-        (id, nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, created_by, created_at, updated_at, deleted_at)
-      SELECT id, nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, created_by, created_at, updated_at, deleted_at
-      FROM surat_keluar;
-      DROP TABLE surat_keluar;
-      ALTER TABLE surat_keluar_new RENAME TO surat_keluar;
-    `);
-  });
-  rebuild();
 }
 
 // Expand the users.role CHECK constraint whenever a new role (e.g. a new bidang)
