@@ -29,7 +29,8 @@ function buildList(req) {
     sql += ' AND angkatan = ?';
     params.push(angkatan);
   }
-  sql += ' ORDER BY nama ASC';
+  // Ordinal ordering by angkatan: older (lower number) first, then by name.
+  sql += ' ORDER BY CAST(angkatan AS INTEGER) ASC, nama ASC';
   return { rows: db.prepare(sql).all(...params), filters: { q, angkatan, status } };
 }
 
