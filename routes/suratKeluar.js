@@ -29,7 +29,8 @@ function buildList(req) {
     sql += " AND strftime('%Y', tanggal) = ?";
     params.push(tahun);
   }
-  sql += ' ORDER BY tanggal ASC, id ASC';
+  // Urutkan berdasarkan nomor urut surat (angka di awal nomor_surat).
+  sql += ' ORDER BY CAST(nomor_surat AS INTEGER) ASC, nomor_surat ASC';
   return { rows: db.prepare(sql).all(...params), filters: { q, bulan, tahun } };
 }
 

@@ -47,9 +47,8 @@ function panitiaRouter(panitia) {
         }
         if (f.bulan) { sql += " AND strftime('%m', tanggal) = ?"; params.push(String(f.bulan).padStart(2, '0')); }
         if (f.tahun) { sql += " AND strftime('%Y', tanggal) = ?"; params.push(f.tahun); }
-        sql += ' ORDER BY tanggal ASC, id ASC';
-        return db.prepare(sql).all(...params);
-    }
+    // Urutkan berdasarkan nomor urut surat (angka di awal nomor_surat).
+    sql += ' ORDER BY CAST(nomor_surat AS INTEGER) ASC, nomor_surat ASC';
 
     router.get('/', (req, res) => {
         const active = req.query.tab === 'masuk' ? 'masuk' : 'keluar';
