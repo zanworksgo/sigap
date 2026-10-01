@@ -64,43 +64,6 @@ function init() {
       FOREIGN KEY (created_by) REFERENCES users(id)
     );
 
-    CREATE TABLE IF NOT EXISTS surat_masuk_panitia (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      kepanitiaan TEXT NOT NULL,
-      nomor_surat TEXT NOT NULL,
-      tanggal_masuk TEXT NOT NULL,
-      asal_surat TEXT NOT NULL,
-      perihal TEXT NOT NULL,
-      penerima TEXT NOT NULL,
-      file_path TEXT,
-      file_original TEXT,
-      created_by INTEGER,
-      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-      deleted_at TEXT,
-      FOREIGN KEY (created_by) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS surat_keluar_panitia (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      kepanitiaan TEXT NOT NULL,
-      nomor_surat TEXT NOT NULL,
-      perihal TEXT NOT NULL,
-      ditujukan TEXT NOT NULL,
-      tanggal TEXT NOT NULL,
-      file_path TEXT,
-      file_original TEXT,
-      created_by INTEGER,
-      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-      deleted_at TEXT,
-      FOREIGN KEY (created_by) REFERENCES users(id)
-    );
-
-    -- Nomor surat keluar kepanitiaan unik per kepanitiaan (soft-delete aware).
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_surat_keluar_panitia_nomor
-      ON surat_keluar_panitia (kepanitiaan, nomor_surat) WHERE deleted_at IS NULL;
-
     CREATE TABLE IF NOT EXISTS anggota (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nama TEXT NOT NULL,

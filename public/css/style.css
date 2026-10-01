@@ -76,6 +76,48 @@ a {
     box-shadow: var(--shadow);
 }
 
+/* Password field with show/hide toggle */
+.pw-wrap {
+    position: relative;
+    display: block;
+}
+
+.pw-wrap input {
+    width: 100%;
+    padding-right: 44px;
+}
+
+.pw-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 42px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.pw-toggle svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.pw-toggle span {
+    display: inline-flex;
+    align-items: center;
+}
+
+.pw-toggle:hover {
+    color: var(--primary);
+}
+
 .login-brand {
     text-align: center;
     margin-bottom: 24px;

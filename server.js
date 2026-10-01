@@ -10,7 +10,6 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const { init, db } = require('./db/database');
 const { MODULES, ROLE_ACCESS, canAccess, canWrite } = require('./config/permissions');
 const BIDANG = require('./config/bidang');
-const KEPANITIAAN = require('./config/kepanitiaan');
 const format = require('./utils/format');
 const { requireAuth } = require('./middleware/auth');
 
@@ -139,16 +138,7 @@ app.use((req, res, next) => {
       .filter((g) => g.items.length > 0)
     : [];
 
-  // Arsip surat per kepanitiaan (Pasmansa Cup, Spartacus, ...).
-  const panitiaGroups = user && canAccess(user.role, 'surat_panitia')
-    ? [{
-      label: 'Kepanitiaan',
-      icon: 'award',
-      items: KEPANITIAAN.map((p) => ({ href: '/panitia/' + p.slug, icon: p.icon, label: p.label }))
-    }]
-    : [];
-
-  res.locals.menuGroups = [...staticGroups, ...panitiaGroups, ...bidangGroups];
+  res.locals.menuGroups = [...staticGroups, ...bidangGroups];
   next();
 });
 
@@ -172,12 +162,6 @@ const { daftarRouter, hasilRouter } = require('./routes/programKerja');
 BIDANG.forEach((b) => {
   app.use('/daftar-program-' + b.slug, requireAuth, daftarRouter(b));
   app.use('/hasil-program-' + b.slug, requireAuth, hasilRouter(b));
-});
-
-// Surat Kepanitiaan routes, one router per kepanitiaan (masuk + keluar).
-const panitiaRouter = require('./routes/suratPanitia');
-KEPANITIAAN.forEach((p) => {
-  app.use('/panitia/' + p.slug, requireAuth, panitiaRouter(p));
 });
 
 app.get('/', (req, res) => {
