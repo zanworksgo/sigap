@@ -9,6 +9,13 @@
     // Apply saved theme before paint to avoid flash.
     (function () { var t = localStorage.getItem('sigap-theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();
   </script>
+  <!-- Turbo Drive: instant page switches without full reloads -->
+  <script src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.12/dist/turbo.es2017-umd.min.js"></script>
+  <script>
+    // Links use Turbo for smooth navigation; forms keep normal submit so
+    // redirects, uploads, and flash messages stay reliable.
+    if (window.Turbo) Turbo.setFormMode('optin');
+  </script>
 </head>
 <body>
   <div class="app">

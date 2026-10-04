@@ -39,36 +39,48 @@ function closeModal(id) {
   const m = document.getElementById(id);
   if (m) m.classList.remove('open');
 }
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('modal-backdrop')) {
-    e.target.classList.remove('open');
-  }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    document.querySelectorAll('.modal-backdrop.open').forEach((m) => m.classList.remove('open'));
-  }
-});
+// Document-level listeners bound once so Turbo body swaps don't duplicate them.
+if (!window.__sigapBound) {
+  window.__sigapBound = true;
 
-// ===== Prevent double submit + loading state =====
-document.addEventListener('submit', (e) => {
-  const form = e.target;
-  if (form.dataset.noguard) return;
-  const btn = form.querySelector('button[type="submit"]');
-  if (btn) {
-    btn.disabled = true;
-    const orig = btn.innerHTML;
-    btn.dataset.orig = orig;
-    btn.innerHTML = 'Menyimpan...';
-    // Re-enable if navigation somehow does not occur.
-    setTimeout(() => {
-      if (btn.disabled) { btn.disabled = false; btn.innerHTML = orig; }
-    }, 8000);
-  }
-});
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-backdrop')) {
+      e.target.classList.remove('open');
+    }
+  });
 
-// ===== Toast auto-dismiss =====
-document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-backdrop.open').forEach((m) => m.classList.remove('open'));
+    }
+  });
+
+  // Prevent double submit + loading state.
+  document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (form.dataset.noguard) return;
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      const orig = btn.innerHTML;
+      btn.dataset.orig = orig;
+      btn.innerHTML = 'Menyimpan...';
+      // Re-enable if navigation somehow does not occur.
+      setTimeout(() => {
+        if (btn.disabled) { btn.disabled = false; btn.innerHTML = orig; }
+      }, 8000);
+    }
+  });
+
+  // Let the browser handle PDF/file links natively (preview/download),
+  // instead of Turbo trying to render them as HTML.
+  document.addEventListener('turbo:click', (e) => {
+    if ((e.detail.url || '').includes('/file/')) e.preventDefault();
+  });
+}
+
+// ===== Per-page init: runs on first load and after each Turbo navigation =====
+function sigapPageInit() {
   updateThemeIcon();
   restoreSidebarScroll();
   const toast = document.querySelector('.toast');
@@ -79,7 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => toast.remove(), 400);
     }, 3500);
   }
-});
+}
+
+// main.js sits at the end of <body>, so the DOM is ready here; it also re-runs
+// on every Turbo visit, re-initialising the freshly swapped page.
+sigapPageInit();
 
 // ===== Keep sidebar scroll position across page navigations =====
 function restoreSidebarScroll() {
