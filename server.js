@@ -246,7 +246,14 @@ async function start() {
   });
 }
 
-start().catch((err) => {
-  console.error('Gagal memulai server:', err);
-  process.exit(1);
-});
+// On Vercel the app runs as a serverless function: export the app and skip the
+// listen/init bootstrap (schema & storage are already provisioned in Supabase).
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  start().catch((err) => {
+    console.error('Gagal memulai server:', err);
+    process.exit(1);
+  });
+  module.exports = app;
+}
