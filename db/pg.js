@@ -15,9 +15,13 @@ const ROLE_CHECK = ALL_ROLES.map((r) => `'${String(r).replace(/'/g, "''")}'`).jo
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: Number(process.env.PG_POOL_MAX || 5),
-  ssl: { rejectUnauthorized: false },
-  // Resolve unqualified table names in our schema on every connection.
-  options: `-c search_path=${SCHEMA},public`
+  ssl: { rejectUnauthorized: false }
+});
+
+// Fallback: ensure each new connection resolves unqualified names in our schema.
+// (The durable fix is the ALTER ROLE ... SET search_path applied in init().)
+pool.on('connect', (client) => {
+  client.query(`SET search_path TO ${SCHEMA}, public`).catch(() => {});
 });
 
 // Translate the SQLite dialect used across the app into PostgreSQL.
@@ -229,6 +233,15 @@ async function init() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_surat_keluar_nomor_active
       ON surat_keluar(nomor_surat) WHERE deleted_at IS NULL;
   `);
+
+  // Durable, pooler-independent search_path so unqualified table names always
+  // resolve to our schema (the connection `options` param is not honoured by
+  // some Supabase pooler modes).
+  try {
+    await pool.query(`ALTER ROLE CURRENT_USER SET search_path TO ${SCHEMA}, public`);
+  } catch (e) {
+    console.warn('Catatan: gagal ALTER ROLE search_path (pakai fallback on-connect):', e.message);
+  }
 }
 
 module.exports = { pool, init, all, get, run, translate, SCHEMA, ALL_ROLES };

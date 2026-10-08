@@ -30,13 +30,21 @@ const TABLES = [
   'transaksi_panitia'
 ];
 
-async function targetColumns(table) {
-  const res = await pool.query(
-    'SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2',
-    [SCHEMA, table]
-  );
-  return res.rows.map((r) => r.column_name);
-}
+// Destination columns per table (must match db/pg.js schema). Used instead of
+// information_schema so column detection never depends on connection state.
+const TABLE_COLUMNS = {
+  users: ['id', 'nama', 'username', 'email', 'password', 'role', 'status', 'created_at', 'updated_at'],
+  surat_masuk: ['id', 'nomor_surat', 'tanggal_masuk', 'asal_surat', 'perihal', 'penerima', 'file_path', 'file_original', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  surat_keluar: ['id', 'nomor_surat', 'perihal', 'ditujukan', 'tanggal', 'file_path', 'file_original', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  anggota: ['id', 'nama', 'tempat_lahir', 'tanggal_lahir', 'kelas', 'alamat', 'no_hp', 'angkatan', 'nra', 'jabatan', 'foto_path', 'foto_original', 'status', 'keluar_bukti_path', 'keluar_bukti_original', 'catatan', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  dokumentasi: ['id', 'nama_kegiatan', 'tanggal', 'link', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  transaksi: ['id', 'jenis', 'tanggal', 'uraian', 'kategori', 'nominal', 'keterangan', 'bukti_path', 'bukti_original', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  daftar_program: ['id', 'bidang', 'nama_program', 'target', 'status', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  hasil_program: ['id', 'bidang', 'nama_kegiatan', 'tanggal_mulai', 'tanggal_selesai', 'target', 'hasil', 'penanggung_jawab', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  surat_masuk_panitia: ['id', 'kepanitiaan', 'nomor_surat', 'tanggal_masuk', 'asal_surat', 'perihal', 'penerima', 'file_path', 'file_original', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  surat_keluar_panitia: ['id', 'kepanitiaan', 'nomor_surat', 'perihal', 'ditujukan', 'tanggal', 'file_path', 'file_original', 'created_by', 'created_at', 'updated_at', 'deleted_at'],
+  transaksi_panitia: ['id', 'kepanitiaan', 'jenis', 'tanggal', 'uraian', 'kategori', 'nominal', 'keterangan', 'bukti_path', 'bukti_original', 'created_by', 'created_at', 'updated_at', 'deleted_at']
+};
 
 function sqliteHasTable(sqlite, table) {
   return !!sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
@@ -59,8 +67,8 @@ async function migrate(sqlitePath = DEFAULT_SQLITE_PATH) {
       continue;
     }
     const srcCols = sqlite.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
-    const dstCols = await targetColumns(table);
-    const cols = srcCols.filter((c) => dstCols.includes(c));
+    const dstCols = TABLE_COLUMNS[table] || [];
+    const cols = dstCols.filter((c) => srcCols.includes(c));
     const rows = sqlite.prepare(`SELECT * FROM ${table}`).all();
 
     if (cols.length === 0) {
