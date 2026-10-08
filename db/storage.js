@@ -16,16 +16,19 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const BUCKET = (process.env.SUPABASE_BUCKET || 'uploads').trim();
 
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.warn('PERINGATAN: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum di-set; upload file tidak akan berfungsi.');
+const CONFIGURED = !!(SUPABASE_URL && SERVICE_KEY);
+if (!CONFIGURED) {
+  console.warn('PERINGATAN: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum di-set; fitur upload/file nonaktif.');
 }
 
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { persistSession: false }
-});
+// Only build the client when configured, so a missing key never crashes boot.
+const supabase = CONFIGURED
+  ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
+  : null;
 
 // Create the (private) bucket once if it doesn't exist yet.
 async function initStorage() {
+  if (!CONFIGURED) return;
   try {
     const { data } = await supabase.storage.getBucket(BUCKET);
     if (!data) {
@@ -41,6 +44,7 @@ async function initStorage() {
 }
 
 async function uploadBuffer(key, buffer, contentType) {
+  if (!CONFIGURED) throw new Error('Supabase Storage belum dikonfigurasi di server.');
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(key, buffer, { contentType: contentType || 'application/octet-stream', upsert: true });
@@ -50,13 +54,14 @@ async function uploadBuffer(key, buffer, contentType) {
 
 // Returns a Node Buffer for the object, or null if it does not exist.
 async function downloadBuffer(key) {
+  if (!CONFIGURED) return null;
   const { data, error } = await supabase.storage.from(BUCKET).download(key);
   if (error || !data) return null;
   return Buffer.from(await data.arrayBuffer());
 }
 
 async function removeObject(key) {
-  if (!key) return;
+  if (!CONFIGURED || !key) return;
   const clean = key.replace(/^uploads[\\/]/, '');
   await supabase.storage.from(BUCKET).remove([clean]).catch(() => {});
 }
