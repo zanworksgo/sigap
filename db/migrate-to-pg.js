@@ -63,15 +63,23 @@ async function migrate(sqlitePath = DEFAULT_SQLITE_PATH) {
     const cols = srcCols.filter((c) => dstCols.includes(c));
     const rows = sqlite.prepare(`SELECT * FROM ${table}`).all();
 
+    if (cols.length === 0) {
+      console.log(`- ${table}: DILEWATI (kolom tidak cocok). src=[${srcCols}] dst=[${dstCols}]`);
+      continue;
+    }
+
     let inserted = 0;
     for (const row of rows) {
       const values = cols.map((c) => row[c]);
       const placeholders = cols.map((_, i) => '$' + (i + 1)).join(', ');
-      const res = await pool.query(
-        `INSERT INTO ${SCHEMA}.${table} (${cols.join(', ')}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING`,
-        values
-      );
-      inserted += res.rowCount;
+      const sql = `INSERT INTO ${SCHEMA}.${table} (${cols.join(', ')}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING`;
+      try {
+        const res = await pool.query(sql, values);
+        inserted += res.rowCount;
+      } catch (e) {
+        console.error(`GAGAL insert ke ${table}:`, e.message, '\nSQL:', sql);
+        throw e;
+      }
     }
 
     // Realign the id sequence so new inserts don't collide with migrated ids.

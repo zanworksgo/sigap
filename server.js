@@ -226,7 +226,12 @@ async function start() {
   // One-time data import from the legacy SQLite volume into Supabase.
   // Set RUN_SQLITE_MIGRATION=1 for the first deploy, then remove it.
   if (process.env.RUN_SQLITE_MIGRATION === '1') {
-    await require('./db/migrate-to-pg').migrate(process.env.SQLITE_PATH);
+    try {
+      await require('./db/migrate-to-pg').migrate(process.env.SQLITE_PATH);
+    } catch (err) {
+      // Don't crash the app on migration failure; log and keep serving.
+      console.error('Migrasi data gagal (app tetap jalan):', err);
+    }
   } else {
     const row = await get('SELECT COUNT(*) AS c FROM users');
     if (Number(row.c) === 0) {
