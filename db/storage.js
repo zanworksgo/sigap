@@ -6,6 +6,12 @@
 // or "surat-masuk-panitia/<slug>/<file>".
 const { createClient } = require('@supabase/supabase-js');
 
+// supabase-js initialises a realtime client that needs a global WebSocket.
+// Node < 22 has none, so polyfill with `ws` (we only use Storage here).
+if (!globalThis.WebSocket) {
+  try { globalThis.WebSocket = require('ws'); } catch { /* optional */ }
+}
+
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const BUCKET = (process.env.SUPABASE_BUCKET || 'uploads').trim();
