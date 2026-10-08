@@ -8,7 +8,7 @@ require('express-async-errors');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 
-const { init, pool, get } = require('./db/pg');
+const { init, pool, get, SCHEMA } = require('./db/pg');
 const { MODULES, ROLE_ACCESS, canAccess, canWrite } = require('./config/permissions');
 const BIDANG = require('./config/bidang');
 const KEPANITIAAN = require('./config/kepanitiaan');
@@ -46,7 +46,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   store: new pgSession({
     pool,
-    schemaName: process.env.PG_SCHEMA || 'sigap',
+    schemaName: SCHEMA,
     tableName: 'session',
     createTableIfMissing: true
   }),

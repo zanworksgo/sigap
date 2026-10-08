@@ -6,7 +6,7 @@
 const { Pool } = require('pg');
 const BIDANG = require('../config/bidang');
 
-const SCHEMA = process.env.PG_SCHEMA || 'sigap';
+const SCHEMA = (process.env.PG_SCHEMA || 'sigap').trim();
 
 const BASE_ROLES = ['Admin', 'Ketua Umum', 'Sekretaris', 'Humas', 'Bendahara'];
 const ALL_ROLES = [...BASE_ROLES, ...BIDANG.map((b) => b.role).filter((r) => !BASE_ROLES.includes(r))];
