@@ -223,6 +223,22 @@ app.use((err, req, res, next) => {
 async function start() {
   await init();
 
+  // Startup diagnostic: report where uploads resolve and what exists there.
+  try {
+    const uproot = (process.env.UPLOAD_ROOT || path.join(__dirname, 'uploads')).trim();
+    if (fs.existsSync(uproot)) {
+      const cats = fs.readdirSync(uproot, { withFileTypes: true }).filter((d) => d.isDirectory());
+      const summary = cats.map((d) => {
+        try { return `${d.name}:${fs.readdirSync(path.join(uproot, d.name)).length}`; } catch { return `${d.name}:?`; }
+      });
+      console.log(`UPLOAD_ROOT=${uproot} | folder: ${summary.join(', ') || '(kosong)'}`);
+    } else {
+      console.log(`UPLOAD_ROOT=${uproot} | TIDAK ADA`);
+    }
+  } catch (e) {
+    console.log('Diagnostik uploads gagal:', e.message);
+  }
+
   // One-time data import from the legacy SQLite volume into Supabase.
   // Set RUN_SQLITE_MIGRATION=1 for the first deploy, then remove it.
   if (process.env.RUN_SQLITE_MIGRATION === '1') {

@@ -5,7 +5,10 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 
-const UPLOAD_ROOT = path.join(__dirname, '..', 'uploads');
+// Persist uploads on the mounted volume (set UPLOAD_ROOT=/app/data/uploads on the
+// host). Falls back to a local folder in development. Trimmed to tolerate stray
+// whitespace in the env value.
+const UPLOAD_ROOT = (process.env.UPLOAD_ROOT || path.join(__dirname, '..', 'uploads')).trim();
 
 const ALLOWED = {
   '.pdf': ['application/pdf'],
