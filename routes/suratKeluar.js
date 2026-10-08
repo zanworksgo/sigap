@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 const { createUploader, removeFile } = require('../middleware/upload');
 
@@ -10,7 +10,7 @@ const upload = createUploader('surat-keluar');
 
 router.use(requireAccess('surat_keluar'));
 
-function buildList(req) {
+async function buildList(req) {
   const q = (req.query.q || '').trim();
   const bulan = (req.query.bulan || '').trim();
   const tahun = (req.query.tahun || '').trim();
@@ -30,12 +30,12 @@ function buildList(req) {
     params.push(tahun);
   }
   // Urutkan berdasarkan nomor urut surat (angka di awal nomor_surat).
-  sql += ' ORDER BY CAST(nomor_surat AS INTEGER) ASC, nomor_surat ASC';
-  return { rows: db.prepare(sql).all(...params), filters: { q, bulan, tahun } };
+  sql += " ORDER BY (substring(nomor_surat from '^[0-9]+'))::int ASC NULLS LAST, nomor_surat ASC";
+  return { rows: await all(sql, params), filters: { q, bulan, tahun } };
 }
 
-router.get('/', (req, res) => {
-  const { rows, filters } = buildList(req);
+router.get('/', async (req, res) => {
+  const { rows, filters } = await buildList(req);
   res.render('surat-keluar/index', {
     title: 'Surat Keluar',
     rows,
@@ -45,8 +45,8 @@ router.get('/', (req, res) => {
   });
 });
 
-router.get('/print', (req, res) => {
-  const { rows, filters } = buildList(req);
+router.get('/print', async (req, res) => {
+  const { rows, filters } = await buildList(req);
   res.render('surat-keluar/print', {
     title: 'Cetak Data Surat Keluar',
     layout: false,
@@ -55,13 +55,13 @@ router.get('/print', (req, res) => {
   });
 });
 
-router.get('/:id/detail', (req, res) => {
-  const row = db.prepare('SELECT * FROM surat_keluar WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+router.get('/:id/detail', async (req, res) => {
+  const row = await get('SELECT * FROM surat_keluar WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
   if (!row) return res.status(404).json({ error: 'Data tidak ditemukan.' });
   res.json(row);
 });
 
-router.post('/', requireWrite('surat_keluar'), upload.single('file'), (req, res) => {
+router.post('/', requireWrite('surat_keluar'), upload.single('file'), async (req, res) => {
   const nomor_surat = (req.body.nomor_surat || '').trim();
   const perihal = (req.body.perihal || '').trim();
   const ditujukan = (req.body.ditujukan || '').trim();
@@ -72,7 +72,7 @@ router.post('/', requireWrite('surat_keluar'), upload.single('file'), (req, res)
     return res.redirect('/surat-keluar?type=error&msg=' + encodeURIComponent('Semua field wajib diisi.'));
   }
 
-  const dup = db.prepare('SELECT id FROM surat_keluar WHERE nomor_surat = ? AND deleted_at IS NULL').get(nomor_surat);
+  const dup = await get('SELECT id FROM surat_keluar WHERE nomor_surat = ? AND deleted_at IS NULL', [nomor_surat]);
   if (dup) {
     if (req.file) removeFile('surat-keluar/' + req.file.filename);
     return res.redirect('/surat-keluar?type=error&msg=' + encodeURIComponent('Nomor surat sudah terdaftar.'));
@@ -81,16 +81,17 @@ router.post('/', requireWrite('surat_keluar'), upload.single('file'), (req, res)
   const file_path = req.file ? 'surat-keluar/' + req.file.filename : null;
   const file_original = req.file ? req.file.originalname : null;
 
-  db.prepare(
+  await run(
     `INSERT INTO surat_keluar (nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, req.session.user.id);
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, req.session.user.id]
+  );
 
   res.redirect('/surat-keluar?msg=' + encodeURIComponent('Surat keluar berhasil ditambahkan.'));
 });
 
-router.post('/:id/edit', requireWrite('surat_keluar'), upload.single('file'), (req, res) => {
-  const row = db.prepare('SELECT * FROM surat_keluar WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+router.post('/:id/edit', requireWrite('surat_keluar'), upload.single('file'), async (req, res) => {
+  const row = await get('SELECT * FROM surat_keluar WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
   if (!row) {
     if (req.file) removeFile('surat-keluar/' + req.file.filename);
     return res.redirect('/surat-keluar?type=error&msg=' + encodeURIComponent('Data tidak ditemukan.'));
@@ -106,7 +107,7 @@ router.post('/:id/edit', requireWrite('surat_keluar'), upload.single('file'), (r
     return res.redirect('/surat-keluar?type=error&msg=' + encodeURIComponent('Semua field wajib diisi.'));
   }
 
-  const dup = db.prepare('SELECT id FROM surat_keluar WHERE nomor_surat = ? AND id <> ? AND deleted_at IS NULL').get(nomor_surat, row.id);
+  const dup = await get('SELECT id FROM surat_keluar WHERE nomor_surat = ? AND id <> ? AND deleted_at IS NULL', [nomor_surat, row.id]);
   if (dup) {
     if (req.file) removeFile('surat-keluar/' + req.file.filename);
     return res.redirect('/surat-keluar?type=error&msg=' + encodeURIComponent('Nomor surat sudah terdaftar.'));
@@ -120,16 +121,17 @@ router.post('/:id/edit', requireWrite('surat_keluar'), upload.single('file'), (r
     file_original = req.file.originalname;
   }
 
-  db.prepare(
+  await run(
     `UPDATE surat_keluar SET nomor_surat=?, perihal=?, ditujukan=?, tanggal=?, file_path=?, file_original=?, updated_at=datetime('now','localtime')
-     WHERE id=?`
-  ).run(nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, row.id);
+     WHERE id=?`,
+    [nomor_surat, perihal, ditujukan, tanggal, file_path, file_original, row.id]
+  );
 
   res.redirect('/surat-keluar?msg=' + encodeURIComponent('Surat keluar berhasil diperbarui.'));
 });
 
-router.post('/:id/delete', requireWrite('surat_keluar'), (req, res) => {
-  db.prepare(`UPDATE surat_keluar SET deleted_at=datetime('now','localtime') WHERE id=?`).run(req.params.id);
+router.post('/:id/delete', requireWrite('surat_keluar'), async (req, res) => {
+  await run(`UPDATE surat_keluar SET deleted_at=datetime('now','localtime') WHERE id=?`, [req.params.id]);
   res.redirect('/surat-keluar?msg=' + encodeURIComponent('Surat keluar diarsipkan.'));
 });
 

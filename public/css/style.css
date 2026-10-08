@@ -141,7 +141,6 @@ a {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: inherit;
 }
 
 .login-title {
@@ -621,6 +620,11 @@ tbody tr:last-child td {
 .badge-primary {
     background: var(--primary-soft);
     color: var(--primary);
+}
+
+.badge-warning {
+    background: rgba(217, 119, 6, 0.12);
+    color: #b7791f;
 }
 
 .badge-muted {

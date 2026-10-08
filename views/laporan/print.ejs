@@ -28,7 +28,7 @@
         <tr>
           <td class="text-center"><%= i + 1 %></td>
           <td><%= fmt.formatTanggal(r.tanggal) %></td>
-          <td><%= r.uraian %></td>
+          <td><%= r.uraian || '-' %></td>
           <td class="text-right"><%= r.jenis === 'Pemasukan' ? fmt.formatRupiah(r.nominal) : '-' %></td>
           <td class="text-right"><%= r.jenis === 'Pengeluaran' ? fmt.formatRupiah(r.nominal) : '-' %></td>
         </tr>
@@ -41,6 +41,40 @@
     <tr><td>Total Pengeluaran</td><td class="text-right"><%= fmt.formatRupiah(totalKeluar) %></td></tr>
     <tr class="total-row"><td>Saldo</td><td class="text-right"><%= fmt.formatRupiah(saldo) %></td></tr>
   </table>
+
+  <% if (typeof konsolidasi !== 'undefined' && konsolidasi && konsolidasi.panitiaList.length) { %>
+  <h3 style="margin-top:18px;font-size:12pt;">Ringkasan Keuangan Kepanitiaan (keseluruhan)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Kepanitiaan</th>
+        <th class="text-right">Alokasi</th>
+        <th class="text-right">Pemasukan</th>
+        <th class="text-right">Pengeluaran</th>
+        <th class="text-right">Dikembalikan</th>
+        <th class="text-right">Saldo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% konsolidasi.panitiaList.forEach(function(p) { %>
+        <tr>
+          <td><%= p.label %></td>
+          <td class="text-right"><%= fmt.formatRupiah(p.Alokasi) %></td>
+          <td class="text-right"><%= fmt.formatRupiah(p.Pemasukan) %></td>
+          <td class="text-right"><%= fmt.formatRupiah(p.Pengeluaran) %></td>
+          <td class="text-right"><%= fmt.formatRupiah(p.Pengembalian) %></td>
+          <td class="text-right"><%= fmt.formatRupiah(p.saldo) %></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <table class="print-summary">
+    <tr><td>Kas Umum Tersedia</td><td class="text-right"><%= fmt.formatRupiah(konsolidasi.kasUmumTersedia) %></td></tr>
+    <tr><td>Total Saldo Kepanitiaan</td><td class="text-right"><%= fmt.formatRupiah(konsolidasi.totalSaldoPanitia) %></td></tr>
+    <tr class="total-row"><td>Total Kas Organisasi</td><td class="text-right"><%= fmt.formatRupiah(konsolidasi.totalKasOrganisasi) %></td></tr>
+  </table>
+  <% } %>
 
   <div class="print-sign">
     <div class="box">

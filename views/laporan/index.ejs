@@ -51,7 +51,7 @@
           <tr>
             <td><%= i + 1 %></td>
             <td class="nowrap"><%= fmt.formatTanggal(r.tanggal) %></td>
-            <td><%= r.uraian %></td>
+            <td><%= r.uraian || '-' %></td>
             <td class="text-right mono"><%= r.jenis === 'Pemasukan' ? fmt.formatRupiah(r.nominal) : '-' %></td>
             <td class="text-right mono"><%= r.jenis === 'Pengeluaran' ? fmt.formatRupiah(r.nominal) : '-' %></td>
           </tr>
@@ -67,5 +67,64 @@
     </table>
   </div>
 </div>
+
+<% if (typeof konsolidasi !== 'undefined' && konsolidasi && konsolidasi.panitiaList.length) { %>
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+  <div class="stat-card">
+    <div class="stat-label">Kas Umum Tersedia</div>
+    <div class="stat-value" style="font-size:19px;color:var(--primary);"><%= fmt.formatRupiah(konsolidasi.kasUmumTersedia) %></div>
+    <div class="form-hint">Setelah dikurangi alokasi &amp; ditambah pengembalian.</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Saldo Kepanitiaan</div>
+    <div class="stat-value" style="font-size:19px;color:var(--warning,#b7791f);"><%= fmt.formatRupiah(konsolidasi.totalSaldoPanitia) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Kas Organisasi</div>
+    <div class="stat-value" style="font-size:19px;color:var(--success);"><%= fmt.formatRupiah(konsolidasi.totalKasOrganisasi) %></div>
+    <div class="form-hint">Kas Umum Tersedia + saldo semua kepanitiaan.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Ringkasan Keuangan Kepanitiaan · keseluruhan</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Kepanitiaan</th>
+          <th class="text-right">Alokasi</th>
+          <th class="text-right">Pemasukan</th>
+          <th class="text-right">Pengeluaran</th>
+          <th class="text-right">Dikembalikan</th>
+          <th class="text-right">Saldo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% konsolidasi.panitiaList.forEach(function(p) { %>
+          <tr>
+            <td><a href="/keuangan-panitia/<%= p.slug %>"><%= p.label %></a></td>
+            <td class="text-right mono"><%= fmt.formatRupiah(p.Alokasi) %></td>
+            <td class="text-right mono"><%= fmt.formatRupiah(p.Pemasukan) %></td>
+            <td class="text-right mono"><%= fmt.formatRupiah(p.Pengeluaran) %></td>
+            <td class="text-right mono"><%= fmt.formatRupiah(p.Pengembalian) %></td>
+            <td class="text-right mono"><%= fmt.formatRupiah(p.saldo) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td class="text-right"><b>Total</b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(konsolidasi.totalAlokasi) %></b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(konsolidasi.panitiaList.reduce(function(a,p){return a+p.Pemasukan;},0)) %></b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(konsolidasi.totalPengeluaranPanitia) %></b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(konsolidasi.totalPengembalian) %></b></td>
+          <td class="text-right mono"><b><%= fmt.formatRupiah(konsolidasi.totalSaldoPanitia) %></b></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+<% } %>
 
 <%- include('../partials/bottom') %>

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "seed": "node db/seed.js"
+    "seed": "node db/seed.js",
+    "migrate:pg": "node db/migrate-to-pg.js"
   },
   "keywords": [
     "sigap",
@@ -21,12 +22,15 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.3.0",
+    "connect-pg-simple": "^10.0.0",
     "connect-sqlite3": "^0.9.15",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.21.0",
+    "express-async-errors": "^3.1.1",
     "express-session": "^1.18.0",
-    "multer": "^2.4.0"
+    "multer": "^2.4.0",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "livereload": "^0.10.3"

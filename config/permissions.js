@@ -18,19 +18,20 @@ const MODULES = {
   dokumentasi: 'Dokumentasi',
   pemasukan: 'Pemasukan',
   pengeluaran: 'Pengeluaran',
-  laporan: 'Laporan Keuangan'
+  laporan: 'Laporan Keuangan',
+  keuangan_panitia: 'Keuangan Kepanitiaan'
 };
 
 // access: modules a role may VIEW.
 // write:  modules a role may CREATE/UPDATE/DELETE.
 const ROLE_ACCESS = {
   Admin: {
-    access: ['dashboard', 'users', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan'],
-    write: ['users', 'surat_masuk', 'surat_keluar', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran']
+    access: ['dashboard', 'users', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
+    write: ['users', 'surat_masuk', 'surat_keluar', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'keuangan_panitia']
   },
   'Ketua Umum': {
     // Read-only monitoring across all administrative modules, grouped per jabatan.
-    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan'],
+    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
     write: []
   },
   Sekretaris: {
@@ -42,8 +43,8 @@ const ROLE_ACCESS = {
     write: ['anggota', 'alumni', 'dokumentasi']
   },
   Bendahara: {
-    access: ['dashboard', 'pemasukan', 'pengeluaran', 'laporan'],
-    write: ['pemasukan', 'pengeluaran']
+    access: ['dashboard', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
+    write: ['pemasukan', 'pengeluaran', 'keuangan_panitia']
   }
 };
 
@@ -52,7 +53,7 @@ const ROLE_ACCESS = {
 const JABATAN_GROUPS = [
   { key: 'sekretaris', label: 'Sekretaris', icon: 'send', modules: ['surat_masuk', 'surat_keluar', 'kode_surat'] },
   { key: 'humas', label: 'Humas', icon: 'user-check', modules: ['anggota', 'alumni', 'dokumentasi'] },
-  { key: 'bendahara', label: 'Bendahara', icon: 'wallet', modules: ['pemasukan', 'pengeluaran', 'laporan'] }
+  { key: 'bendahara', label: 'Bendahara', icon: 'wallet', modules: ['pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'] }
 ];
 
 // Wire each bidang's Program Kerja module into the relevant roles and menus.

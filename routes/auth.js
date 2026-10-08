@@ -2,7 +2,7 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { db } = require('../db/database');
+const { get } = require('../db/pg');
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ router.get('/login', (req, res) => {
   res.render('login', { title: 'Masuk', error: null, values: {} });
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const identifier = (req.body.identifier || '').trim();
   const password = req.body.password || '';
 
@@ -23,9 +23,10 @@ router.post('/login', (req, res) => {
     });
   }
 
-  const user = db.prepare(
-    'SELECT * FROM users WHERE username = ? OR email = ? LIMIT 1'
-  ).get(identifier, identifier);
+  const user = await get(
+    'SELECT * FROM users WHERE username = ? OR email = ? LIMIT 1',
+    [identifier, identifier]
+  );
 
   const invalidMsg = 'Username/email atau password salah.';
   if (!user || !bcrypt.compareSync(password, user.password)) {

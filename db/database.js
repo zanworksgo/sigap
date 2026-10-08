@@ -145,6 +145,57 @@ function init() {
       deleted_at TEXT,
       FOREIGN KEY (created_by) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS surat_masuk_panitia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kepanitiaan TEXT NOT NULL,
+      nomor_surat TEXT NOT NULL,
+      tanggal_masuk TEXT NOT NULL,
+      asal_surat TEXT NOT NULL,
+      perihal TEXT NOT NULL,
+      penerima TEXT NOT NULL,
+      file_path TEXT,
+      file_original TEXT,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      deleted_at TEXT,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS surat_keluar_panitia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kepanitiaan TEXT NOT NULL,
+      nomor_surat TEXT NOT NULL,
+      perihal TEXT NOT NULL,
+      ditujukan TEXT NOT NULL,
+      tanggal TEXT NOT NULL,
+      file_path TEXT,
+      file_original TEXT,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      deleted_at TEXT,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS transaksi_panitia (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kepanitiaan TEXT NOT NULL,
+      jenis TEXT NOT NULL CHECK (jenis IN ('Alokasi','Pemasukan','Pengeluaran','Pengembalian')),
+      tanggal TEXT NOT NULL,
+      uraian TEXT,
+      kategori TEXT,
+      nominal INTEGER NOT NULL DEFAULT 0,
+      keterangan TEXT,
+      bukti_path TEXT,
+      bukti_original TEXT,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+      deleted_at TEXT,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
   `);
 
   migrate();

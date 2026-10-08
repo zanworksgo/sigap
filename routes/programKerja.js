@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 
 const STATUS = [
@@ -18,7 +18,7 @@ function daftarRouter(bidang) {
   const base = '/daftar-program-' + bidang.slug;
   router.use(requireAccess(bidang.module));
 
-  function buildList(req) {
+  async function buildList(req) {
     const q = (req.query.q || '').trim();
     const status = (req.query.status || '').trim();
     let sql = 'SELECT * FROM daftar_program WHERE deleted_at IS NULL AND bidang = ?';
@@ -32,11 +32,11 @@ function daftarRouter(bidang) {
       params.push(status);
     }
     sql += ' ORDER BY id ASC';
-    return { rows: db.prepare(sql).all(...params), filters: { q, status } };
+    return { rows: await all(sql, params), filters: { q, status } };
   }
 
-  router.get('/', (req, res) => {
-    const { rows, filters } = buildList(req);
+  router.get('/', async (req, res) => {
+    const { rows, filters } = await buildList(req);
     res.render('program/daftar', {
       title: 'Daftar Program Kerja \u00B7 ' + bidang.label,
       rows,
@@ -50,8 +50,8 @@ function daftarRouter(bidang) {
     });
   });
 
-  router.get('/print', (req, res) => {
-    const { rows, filters } = buildList(req);
+  router.get('/print', async (req, res) => {
+    const { rows, filters } = await buildList(req);
     res.render('program/daftar-print', { title: 'Cetak Daftar Program Kerja', layout: false, rows, filters, statuses: STATUS, bidang });
   });
 
@@ -63,35 +63,35 @@ function daftarRouter(bidang) {
     return { nama_program, target, status };
   }
 
-  router.post('/', requireWrite(bidang.module), (req, res) => {
+  router.post('/', requireWrite(bidang.module), async (req, res) => {
     const d = parseBody(req);
     if (!d.nama_program) return res.redirect(base + '?type=error&msg=' + encodeURIComponent('Nama program kerja wajib diisi.'));
-    db.prepare('INSERT INTO daftar_program (bidang, nama_program, target, status, created_by) VALUES (?, ?, ?, ?, ?)')
-      .run(bidang.key, d.nama_program, d.target, d.status, req.session.user.id);
+    await run('INSERT INTO daftar_program (bidang, nama_program, target, status, created_by) VALUES (?, ?, ?, ?, ?)',
+      [bidang.key, d.nama_program, d.target, d.status, req.session.user.id]);
     res.redirect(base + '?msg=' + encodeURIComponent('Program kerja berhasil ditambahkan.'));
   });
 
-  router.post('/:id/edit', requireWrite(bidang.module), (req, res) => {
-    const row = db.prepare('SELECT * FROM daftar_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL').get(req.params.id, bidang.key);
+  router.post('/:id/edit', requireWrite(bidang.module), async (req, res) => {
+    const row = await get('SELECT * FROM daftar_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL', [req.params.id, bidang.key]);
     if (!row) return res.redirect(base + '?type=error&msg=' + encodeURIComponent('Data tidak ditemukan.'));
     const d = parseBody(req);
     if (!d.nama_program) return res.redirect(base + '?type=error&msg=' + encodeURIComponent('Nama program kerja wajib diisi.'));
-    db.prepare("UPDATE daftar_program SET nama_program=?, target=?, status=?, updated_at=datetime('now','localtime') WHERE id=?")
-      .run(d.nama_program, d.target, d.status, row.id);
+    await run("UPDATE daftar_program SET nama_program=?, target=?, status=?, updated_at=datetime('now','localtime') WHERE id=?",
+      [d.nama_program, d.target, d.status, row.id]);
     res.redirect(base + '?msg=' + encodeURIComponent('Program kerja berhasil diperbarui.'));
   });
 
-  router.post('/:id/status', requireWrite(bidang.module), (req, res) => {
+  router.post('/:id/status', requireWrite(bidang.module), async (req, res) => {
     const status = (req.body.status || '').trim();
     if (!STATUS_KEYS.includes(status)) return res.redirect(base + '?type=error&msg=' + encodeURIComponent('Status tidak valid.'));
-    const row = db.prepare('SELECT id FROM daftar_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL').get(req.params.id, bidang.key);
+    const row = await get('SELECT id FROM daftar_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL', [req.params.id, bidang.key]);
     if (!row) return res.redirect(base + '?type=error&msg=' + encodeURIComponent('Data tidak ditemukan.'));
-    db.prepare("UPDATE daftar_program SET status=?, updated_at=datetime('now','localtime') WHERE id=?").run(status, row.id);
+    await run("UPDATE daftar_program SET status=?, updated_at=datetime('now','localtime') WHERE id=?", [status, row.id]);
     res.redirect(base + '?msg=' + encodeURIComponent('Status program kerja diperbarui.'));
   });
 
-  router.post('/:id/delete', requireWrite(bidang.module), (req, res) => {
-    db.prepare("UPDATE daftar_program SET deleted_at=datetime('now','localtime') WHERE id=? AND bidang=?").run(req.params.id, bidang.key);
+  router.post('/:id/delete', requireWrite(bidang.module), async (req, res) => {
+    await run("UPDATE daftar_program SET deleted_at=datetime('now','localtime') WHERE id=? AND bidang=?", [req.params.id, bidang.key]);
     res.redirect(base + '?msg=' + encodeURIComponent('Program kerja dihapus.'));
   });
 
@@ -104,7 +104,7 @@ function hasilRouter(bidang) {
   const base = '/hasil-program-' + bidang.slug;
   router.use(requireAccess(bidang.module));
 
-  function buildList(req) {
+  async function buildList(req) {
     const q = (req.query.q || '').trim();
     const tahun = (req.query.tahun || '').trim();
     let sql = 'SELECT * FROM hasil_program WHERE deleted_at IS NULL AND bidang = ?';
@@ -118,22 +118,23 @@ function hasilRouter(bidang) {
       params.push(tahun);
     }
     sql += ' ORDER BY tanggal_mulai DESC, id DESC';
-    return { rows: db.prepare(sql).all(...params), filters: { q, tahun } };
+    return { rows: await all(sql, params), filters: { q, tahun } };
   }
 
-  function distinctTahun() {
-    return db.prepare(
-      "SELECT DISTINCT strftime('%Y', tanggal_mulai) AS th FROM hasil_program WHERE deleted_at IS NULL AND bidang = ? AND tanggal_mulai IS NOT NULL ORDER BY th DESC"
-    ).all(bidang.key).map((r) => r.th);
+  async function distinctTahun() {
+    return (await all(
+      "SELECT DISTINCT strftime('%Y', tanggal_mulai) AS th FROM hasil_program WHERE deleted_at IS NULL AND bidang = ? AND tanggal_mulai IS NOT NULL ORDER BY th DESC",
+      [bidang.key]
+    )).map((r) => r.th);
   }
 
-  router.get('/', (req, res) => {
-    const { rows, filters } = buildList(req);
+  router.get('/', async (req, res) => {
+    const { rows, filters } = await buildList(req);
     res.render('program/hasil', {
       title: 'Hasil Program Kerja \u00B7 ' + bidang.label,
       rows,
       filters,
-      tahunList: distinctTahun(),
+      tahunList: await distinctTahun(),
       bidang,
       base,
       mod: bidang.module,
@@ -142,13 +143,13 @@ function hasilRouter(bidang) {
     });
   });
 
-  router.get('/print', (req, res) => {
-    const { rows, filters } = buildList(req);
+  router.get('/print', async (req, res) => {
+    const { rows, filters } = await buildList(req);
     res.render('program/hasil-print', { title: 'Cetak Hasil Program Kerja', layout: false, rows, filters, bidang });
   });
 
-  router.get('/:id/detail', (req, res) => {
-    const row = db.prepare('SELECT * FROM hasil_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL').get(req.params.id, bidang.key);
+  router.get('/:id/detail', async (req, res) => {
+    const row = await get('SELECT * FROM hasil_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL', [req.params.id, bidang.key]);
     if (!row) return res.status(404).json({ error: 'Data tidak ditemukan.' });
     res.json(row);
   });
@@ -169,28 +170,28 @@ function hasilRouter(bidang) {
     return null;
   }
 
-  router.post('/', requireWrite(bidang.module), (req, res) => {
+  router.post('/', requireWrite(bidang.module), async (req, res) => {
     const d = parseBody(req);
     const err = validate(d);
     if (err) return res.redirect(base + '?type=error&msg=' + encodeURIComponent(err));
-    db.prepare('INSERT INTO hasil_program (bidang, nama_kegiatan, tanggal_mulai, tanggal_selesai, target, hasil, penanggung_jawab, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(bidang.key, d.nama_kegiatan, d.tanggal_mulai, d.tanggal_selesai, d.target, d.hasil, d.penanggung_jawab, req.session.user.id);
+    await run('INSERT INTO hasil_program (bidang, nama_kegiatan, tanggal_mulai, tanggal_selesai, target, hasil, penanggung_jawab, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [bidang.key, d.nama_kegiatan, d.tanggal_mulai, d.tanggal_selesai, d.target, d.hasil, d.penanggung_jawab, req.session.user.id]);
     res.redirect(base + '?msg=' + encodeURIComponent('Hasil program kerja berhasil ditambahkan.'));
   });
 
-  router.post('/:id/edit', requireWrite(bidang.module), (req, res) => {
-    const row = db.prepare('SELECT * FROM hasil_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL').get(req.params.id, bidang.key);
+  router.post('/:id/edit', requireWrite(bidang.module), async (req, res) => {
+    const row = await get('SELECT * FROM hasil_program WHERE id = ? AND bidang = ? AND deleted_at IS NULL', [req.params.id, bidang.key]);
     if (!row) return res.redirect(base + '?type=error&msg=' + encodeURIComponent('Data tidak ditemukan.'));
     const d = parseBody(req);
     const err = validate(d);
     if (err) return res.redirect(base + '?type=error&msg=' + encodeURIComponent(err));
-    db.prepare("UPDATE hasil_program SET nama_kegiatan=?, tanggal_mulai=?, tanggal_selesai=?, target=?, hasil=?, penanggung_jawab=?, updated_at=datetime('now','localtime') WHERE id=?")
-      .run(d.nama_kegiatan, d.tanggal_mulai, d.tanggal_selesai, d.target, d.hasil, d.penanggung_jawab, row.id);
+    await run("UPDATE hasil_program SET nama_kegiatan=?, tanggal_mulai=?, tanggal_selesai=?, target=?, hasil=?, penanggung_jawab=?, updated_at=datetime('now','localtime') WHERE id=?",
+      [d.nama_kegiatan, d.tanggal_mulai, d.tanggal_selesai, d.target, d.hasil, d.penanggung_jawab, row.id]);
     res.redirect(base + '?msg=' + encodeURIComponent('Hasil program kerja berhasil diperbarui.'));
   });
 
-  router.post('/:id/delete', requireWrite(bidang.module), (req, res) => {
-    db.prepare("UPDATE hasil_program SET deleted_at=datetime('now','localtime') WHERE id=? AND bidang=?").run(req.params.id, bidang.key);
+  router.post('/:id/delete', requireWrite(bidang.module), async (req, res) => {
+    await run("UPDATE hasil_program SET deleted_at=datetime('now','localtime') WHERE id=? AND bidang=?", [req.params.id, bidang.key]);
     res.redirect(base + '?msg=' + encodeURIComponent('Hasil program kerja dihapus.'));
   });
 

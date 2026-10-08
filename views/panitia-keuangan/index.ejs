@@ -1,10 +1,39 @@
 <%- include('../partials/top') %>
-<% const writable = canWrite(moduleKey); %>
+<% const writable = canWrite('keuangan_panitia'); %>
+<% const filterQS = new URLSearchParams(filters).toString(); %>
+<%
+  const jenisBadge = {
+    'Alokasi': 'badge-primary',
+    'Pemasukan': 'badge-success',
+    'Pengeluaran': 'badge-danger',
+    'Pengembalian': 'badge-warning'
+  };
+%>
 
-<form class="toolbar" method="GET" action="/<%= basePath %>" data-noguard>
+<div class="tabs">
+  <% if (canAccess('surat_panitia')) { %>
+  <a class="tab-link" href="/panitia/<%= panitia.slug %>?tab=masuk">
+    <%- include('../partials/icon', { name: 'inbox', cls: 'nav-icon' }) %> Surat Masuk
+  </a>
+  <a class="tab-link" href="/panitia/<%= panitia.slug %>?tab=keluar">
+    <%- include('../partials/icon', { name: 'send', cls: 'nav-icon' }) %> Surat Keluar
+  </a>
+  <% } %>
+  <a class="tab-link active" href="<%= base %>">
+    <%- include('../partials/icon', { name: 'wallet', cls: 'nav-icon' }) %> Keuangan
+  </a>
+</div>
+
+<form class="toolbar" method="GET" action="<%= base %>" data-noguard>
   <div class="grow">
     <input type="text" name="q" value="<%= filters.q %>" placeholder="Cari uraian, keterangan..." />
   </div>
+  <select name="jenis" onchange="this.form.submit()">
+    <option value="">Semua Jenis</option>
+    <% jenisList.forEach(function(j) { %>
+      <option value="<%= j %>" <%= filters.jenis === j ? 'selected' : '' %>><%= j %></option>
+    <% }); %>
+  </select>
   <select name="bulan" onchange="this.form.submit()">
     <option value="">Semua Bulan</option>
     <% fmt.MONTHS.forEach(function(m, i) { %>
@@ -19,22 +48,37 @@
   </select>
   <button type="submit" class="btn">Cari</button>
   <div class="toolbar-right">
-    <a class="btn" target="_blank" href="/<%= basePath %>/print?<%= new URLSearchParams(filters).toString() %>">
+    <a class="btn" target="_blank" href="<%= base %>/print?<%= filterQS %>">
       <%- include('../partials/icon', { name: 'printer' }) %> Cetak Data
     </a>
     <% if (writable) { %>
       <button type="button" class="btn btn-primary" onclick="openAdd()">
-        <%- include('../partials/icon', { name: 'plus' }) %> Tambah <%= jenis %>
+        <%- include('../partials/icon', { name: 'plus' }) %> Tambah Transaksi
       </button>
     <% } %>
   </div>
 </form>
 
-<div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));">
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));">
   <div class="stat-card">
-    <div class="stat-icon"><%- include('../partials/icon', { name: jenis === 'Pemasukan' ? 'trending-up' : 'trending-down' }) %></div>
-    <div class="stat-label">Total <%= jenis %> (sesuai filter)</div>
-    <div class="stat-value" style="font-size:20px;"><%= fmt.formatRupiah(total) %></div>
+    <div class="stat-label">Alokasi dari Kas Umum</div>
+    <div class="stat-value" style="font-size:18px;color:var(--primary);"><%= fmt.formatRupiah(sum.Alokasi) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Pemasukan Panitia</div>
+    <div class="stat-value" style="font-size:18px;color:var(--success);"><%= fmt.formatRupiah(sum.Pemasukan) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Pengeluaran</div>
+    <div class="stat-value" style="font-size:18px;color:var(--danger);"><%= fmt.formatRupiah(sum.Pengeluaran) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Dikembalikan ke Kas Umum</div>
+    <div class="stat-value" style="font-size:18px;color:var(--warning,#b7791f);"><%= fmt.formatRupiah(sum.Pengembalian) %></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Saldo Panitia</div>
+    <div class="stat-value" style="font-size:18px;color:var(--primary);"><%= fmt.formatRupiah(sum.saldo) %></div>
   </div>
 </div>
 
@@ -42,21 +86,25 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>No.</th><th>Tanggal</th><th>Uraian</th><th class="text-right">Nominal</th><th>Bukti</th><th class="text-center">Aksi</th></tr>
+        <tr><th>No.</th><th>Tanggal</th><th>Jenis</th><th>Uraian</th><th class="text-right">Nominal</th><th>Bukti/Nota</th><th class="text-center">Aksi</th></tr>
       </thead>
       <tbody>
         <% if (rows.length === 0) { %>
-          <tr><td colspan="6" class="empty">Belum ada data <%= jenis.toLowerCase() %>.</td></tr>
+          <tr><td colspan="7" class="empty">Belum ada transaksi.</td></tr>
         <% } %>
         <% rows.forEach(function(r, i) { %>
           <tr>
             <td><%= i + 1 %></td>
             <td class="nowrap"><%= fmt.formatTanggal(r.tanggal) %></td>
+            <td><span class="badge <%= jenisBadge[r.jenis] || '' %>"><%= r.jenis %></span></td>
             <td><%= r.uraian %></td>
             <td class="text-right mono"><%= fmt.formatRupiah(r.nominal) %></td>
             <td>
               <% if (r.bukti_path) { %>
-                <a class="btn btn-icon btn-sm" title="Lihat Bukti" target="_blank" href="/file/<%= r.bukti_path %>"><%- include('../partials/icon', { name: 'eye' }) %></a>
+                <div class="action-group">
+                  <a class="btn btn-icon btn-sm" title="Preview" target="_blank" href="/file/<%= r.bukti_path %>"><%- include('../partials/icon', { name: 'eye' }) %></a>
+                  <a class="btn btn-icon btn-sm" title="Download" href="/file/<%= r.bukti_path %>?download=1"><%- include('../partials/icon', { name: 'download' }) %></a>
+                </div>
               <% } else { %><span class="muted">-</span><% } %>
             </td>
             <td>
@@ -64,7 +112,7 @@
                 <button class="btn btn-icon btn-sm" title="Detail" onclick='showDetail(<%- JSON.stringify(r.id) %>)'><%- include('../partials/icon', { name: 'eye' }) %></button>
                 <% if (writable) { %>
                   <button class="btn btn-icon btn-sm" title="Edit" onclick='openEdit(<%- JSON.stringify(r) %>)'><%- include('../partials/icon', { name: 'edit' }) %></button>
-                  <form method="POST" action="/<%= basePath %>/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus data ini?')">
+                  <form method="POST" action="<%= base %>/<%= r.id %>/delete" data-noguard style="display:inline" onsubmit="return confirmDelete('Hapus transaksi ini?')">
                     <button class="btn btn-icon btn-sm btn-danger" title="Hapus"><%- include('../partials/icon', { name: 'trash' }) %></button>
                   </form>
                 <% } %>
@@ -81,31 +129,40 @@
 <div class="modal-backdrop" id="formModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title" id="formTitle">Tambah <%= jenis %></span>
+      <span class="modal-title" id="formTitle">Tambah Transaksi</span>
       <button class="modal-close" onclick="closeModal('formModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
     </div>
-    <form id="trxForm" method="POST" action="/<%= basePath %>" enctype="multipart/form-data">
+    <form id="trxForm" method="POST" action="<%= base %>" enctype="multipart/form-data">
       <div class="modal-body">
         <div class="form-row">
+          <div class="form-group">
+            <label>Jenis <span class="req">*</span></label>
+            <select name="jenis" id="t_jenis" required>
+              <% jenisList.forEach(function(j) { %>
+                <option value="<%= j %>"><%= j %></option>
+              <% }); %>
+            </select>
+            <div class="form-hint">Alokasi &amp; Pengembalian terhubung ke Kas Umum.</div>
+          </div>
           <div class="form-group">
             <label>Tanggal <span class="req">*</span></label>
             <input type="date" name="tanggal" id="t_tanggal" required />
           </div>
-          <div class="form-group">
-            <label>Nominal (Rp) <span class="req">*</span></label>
-            <input type="number" name="nominal" id="t_nominal" min="0" step="1" required />
-          </div>
+        </div>
+        <div class="form-group">
+          <label>Nominal (Rp) <span class="req">*</span></label>
+          <input type="number" name="nominal" id="t_nominal" min="1" step="1" required />
         </div>
         <div class="form-group">
           <label>Uraian <span class="req">*</span></label>
-          <input type="text" name="uraian" id="t_uraian" required />
+          <input type="text" name="uraian" id="t_uraian" placeholder="misal: Konsumsi, Hadiah, Sponsor" required />
         </div>
         <div class="form-group">
           <label>Keterangan</label>
           <textarea name="keterangan" id="t_keterangan"></textarea>
         </div>
         <div class="form-group">
-          <label>Bukti (PDF atau gambar, opsional)</label>
+          <label>Bukti/Nota (PDF atau gambar, opsional)</label>
           <input type="file" name="bukti" accept="application/pdf,image/jpeg,image/png,image/webp" />
           <div class="form-hint">PDF, JPG, PNG, atau WEBP. Maksimal 5 MB.</div>
         </div>
@@ -122,7 +179,7 @@
 <div class="modal-backdrop" id="detailModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">Detail <%= jenis %></span>
+      <span class="modal-title">Detail Transaksi</span>
       <button class="modal-close" onclick="closeModal('detailModal')"><%- include('../partials/icon', { name: 'x' }) %></button>
     </div>
     <div class="modal-body"><dl class="detail-list" id="detailBody"></dl></div>
@@ -131,29 +188,30 @@
 </div>
 
 <script>
-  const BASE = '/<%= basePath %>';
+  const BASE = '<%= base %>';
   function openAdd() {
-    document.getElementById('formTitle').textContent = 'Tambah <%= jenis %>';
+    document.getElementById('formTitle').textContent = 'Tambah Transaksi';
     const f = document.getElementById('trxForm');
     f.action = BASE; f.reset();
     openModal('formModal');
   }
   function openEdit(r) {
-    document.getElementById('formTitle').textContent = 'Edit <%= jenis %>';
+    document.getElementById('formTitle').textContent = 'Edit Transaksi';
     const f = document.getElementById('trxForm');
     f.action = BASE + '/' + r.id + '/edit';
-    f.t_tanggal.value = r.tanggal; f.t_nominal.value = r.nominal;
-    f.t_uraian.value = r.uraian;
+    f.t_jenis.value = r.jenis; f.t_tanggal.value = r.tanggal; f.t_nominal.value = r.nominal;
+    f.t_uraian.value = r.uraian || '';
     f.t_keterangan.value = r.keterangan || '';
     openModal('formModal');
   }
   async function showDetail(id) {
     try {
       const r = await fetchJSON(BASE + '/' + id + '/detail');
-      let html = row('Tanggal', r.tanggal) + row('Uraian', r.uraian) +
+      let html = row('Jenis', r.jenis) + row('Tanggal', r.tanggal) +
+        row('Uraian', r.uraian || '-') +
         row('Nominal', new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(r.nominal)) +
         row('Keterangan', r.keterangan || '-');
-      if (r.bukti_path) html += row('Bukti', '<a target="_blank" href="/file/' + r.bukti_path + '">Lihat Bukti</a>');
+      if (r.bukti_path) html += row('Bukti/Nota', '<a target="_blank" href="/file/' + r.bukti_path + '">Lihat Bukti/Nota</a>');
       document.getElementById('detailBody').innerHTML = html;
       openModal('detailModal');
     } catch (e) { alert(e.message); }

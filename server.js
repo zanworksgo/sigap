@@ -4,22 +4,16 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
+require('express-async-errors');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+const pgSession = require('connect-pg-simple')(session);
 
-const { init, db } = require('./db/database');
+const { init, pool, get } = require('./db/pg');
 const { MODULES, ROLE_ACCESS, canAccess, canWrite } = require('./config/permissions');
 const BIDANG = require('./config/bidang');
 const KEPANITIAAN = require('./config/kepanitiaan');
 const format = require('./utils/format');
 const { requireAuth } = require('./middleware/auth');
-
-init();
-
-// First run on a fresh database (e.g. new hosting volume): create default users.
-if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
-  require('./db/seed').seed({ log: false });
-}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,11 +43,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
-fs.mkdirSync(dataDir, { recursive: true });
-
 app.use(session({
-  store: new SQLiteStore({ db: 'sessions.db', dir: dataDir }),
+  store: new pgSession({
+    pool,
+    schemaName: process.env.PG_SCHEMA || 'sigap',
+    tableName: 'session',
+    createTableIfMissing: true
+  }),
   secret: process.env.SESSION_SECRET || 'sigap-secret',
   resave: false,
   saveUninitialized: false,
@@ -139,16 +135,25 @@ app.use((req, res, next) => {
       .filter((g) => g.items.length > 0)
     : [];
 
-  // Arsip surat per kepanitiaan (Pasmansa Cup, Spartacus, ...).
-  const panitiaGroups = user && canAccess(user.role, 'surat_panitia')
+  // Kepanitiaan: satu item sidebar per panitia. Saat diklik membuka halaman
+  // ber-tab (Surat Masuk/Keluar + Keuangan). Tujuan link mengikuti akses role:
+  // yang punya akses surat masuk ke halaman surat, selain itu ke halaman keuangan.
+  const canSuratPanitia = user && canAccess(user.role, 'surat_panitia');
+  const canKeuanganPanitia = user && canAccess(user.role, 'keuangan_panitia');
+  const kepanitiaanGroups = user && (canSuratPanitia || canKeuanganPanitia)
     ? [{
       label: 'Kepanitiaan',
       icon: 'award',
-      items: KEPANITIAAN.map((p) => ({ href: '/panitia/' + p.slug, icon: p.icon, label: p.label }))
+      items: KEPANITIAAN.map((p) => ({
+        href: (canSuratPanitia ? '/panitia/' : '/keuangan-panitia/') + p.slug,
+        icon: p.icon,
+        label: p.label,
+        match: ['/panitia/' + p.slug, '/keuangan-panitia/' + p.slug]
+      }))
     }]
     : [];
 
-  res.locals.menuGroups = [...staticGroups, ...panitiaGroups, ...bidangGroups];
+  res.locals.menuGroups = [...staticGroups, ...kepanitiaanGroups, ...bidangGroups];
   next();
 });
 
@@ -180,6 +185,12 @@ KEPANITIAAN.forEach((p) => {
   app.use('/panitia/' + p.slug, requireAuth, panitiaRouter(p));
 });
 
+// Keuangan Kepanitiaan routes, one cash-book router per kepanitiaan.
+const keuanganPanitiaRouter = require('./routes/keuanganPanitia');
+KEPANITIAAN.forEach((p) => {
+  app.use('/keuangan-panitia/' + p.slug, requireAuth, keuanganPanitiaRouter(p));
+});
+
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
   res.redirect('/login');
@@ -208,6 +219,27 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || 'Terjadi kesalahan pada server.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`SIGAP berjalan di http://localhost:${PORT}`);
+// Initialise the database, seed defaults on first run, then start listening.
+async function start() {
+  await init();
+
+  // One-time data import from the legacy SQLite volume into Supabase.
+  // Set RUN_SQLITE_MIGRATION=1 for the first deploy, then remove it.
+  if (process.env.RUN_SQLITE_MIGRATION === '1') {
+    await require('./db/migrate-to-pg').migrate(process.env.SQLITE_PATH);
+  } else {
+    const row = await get('SELECT COUNT(*) AS c FROM users');
+    if (Number(row.c) === 0) {
+      await require('./db/seed').seed({ log: false });
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`SIGAP berjalan di http://localhost:${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('Gagal memulai server:', err);
+  process.exit(1);
 });

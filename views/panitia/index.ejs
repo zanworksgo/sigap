@@ -10,6 +10,11 @@
   <a class="tab-link <%= !isMasuk ? 'active' : '' %>" href="<%= base %>?tab=keluar">
     <%- include('../partials/icon', { name: 'send', cls: 'nav-icon' }) %> Surat Keluar
   </a>
+  <% if (canAccess('keuangan_panitia')) { %>
+  <a class="tab-link" href="/keuangan-panitia/<%= panitia.slug %>">
+    <%- include('../partials/icon', { name: 'wallet', cls: 'nav-icon' }) %> Keuangan
+  </a>
+  <% } %>
 </div>
 
 <form class="toolbar" method="GET" action="<%= base %>" data-noguard>

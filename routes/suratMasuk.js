@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 const { createUploader, removeFile } = require('../middleware/upload');
 
@@ -10,7 +10,7 @@ const upload = createUploader('surat-masuk');
 
 router.use(requireAccess('surat_masuk'));
 
-function buildList(req) {
+async function buildList(req) {
   const q = (req.query.q || '').trim();
   const bulan = (req.query.bulan || '').trim();
   const tahun = (req.query.tahun || '').trim();
@@ -30,11 +30,11 @@ function buildList(req) {
     params.push(tahun);
   }
   sql += ' ORDER BY tanggal_masuk ASC, id ASC';
-  return { rows: db.prepare(sql).all(...params), filters: { q, bulan, tahun } };
+  return { rows: await all(sql, params), filters: { q, bulan, tahun } };
 }
 
-router.get('/', (req, res) => {
-  const { rows, filters } = buildList(req);
+router.get('/', async (req, res) => {
+  const { rows, filters } = await buildList(req);
   res.render('surat-masuk/index', {
     title: 'Surat Masuk',
     rows,
@@ -44,8 +44,8 @@ router.get('/', (req, res) => {
   });
 });
 
-router.get('/print', (req, res) => {
-  const { rows, filters } = buildList(req);
+router.get('/print', async (req, res) => {
+  const { rows, filters } = await buildList(req);
   res.render('surat-masuk/print', {
     title: 'Cetak Data Surat Masuk',
     layout: false,
@@ -54,13 +54,13 @@ router.get('/print', (req, res) => {
   });
 });
 
-router.get('/:id/detail', (req, res) => {
-  const row = db.prepare('SELECT * FROM surat_masuk WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+router.get('/:id/detail', async (req, res) => {
+  const row = await get('SELECT * FROM surat_masuk WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
   if (!row) return res.status(404).json({ error: 'Data tidak ditemukan.' });
   res.json(row);
 });
 
-router.post('/', requireWrite('surat_masuk'), upload.single('file'), (req, res) => {
+router.post('/', requireWrite('surat_masuk'), upload.single('file'), async (req, res) => {
   const nomor_surat = (req.body.nomor_surat || '').trim();
   const tanggal_masuk = (req.body.tanggal_masuk || '').trim();
   const asal_surat = (req.body.asal_surat || '').trim();
@@ -75,16 +75,17 @@ router.post('/', requireWrite('surat_masuk'), upload.single('file'), (req, res) 
   const file_path = req.file ? 'surat-masuk/' + req.file.filename : null;
   const file_original = req.file ? req.file.originalname : null;
 
-  db.prepare(
+  await run(
     `INSERT INTO surat_masuk (nomor_surat, tanggal_masuk, asal_surat, perihal, penerima, file_path, file_original, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(nomor_surat, tanggal_masuk, asal_surat, perihal, penerima, file_path, file_original, req.session.user.id);
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [nomor_surat, tanggal_masuk, asal_surat, perihal, penerima, file_path, file_original, req.session.user.id]
+  );
 
   res.redirect('/surat-masuk?msg=' + encodeURIComponent('Surat masuk berhasil ditambahkan.'));
 });
 
-router.post('/:id/edit', requireWrite('surat_masuk'), upload.single('file'), (req, res) => {
-  const row = db.prepare('SELECT * FROM surat_masuk WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+router.post('/:id/edit', requireWrite('surat_masuk'), upload.single('file'), async (req, res) => {
+  const row = await get('SELECT * FROM surat_masuk WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
   if (!row) {
     if (req.file) removeFile('surat-masuk/' + req.file.filename);
     return res.redirect('/surat-masuk?type=error&msg=' + encodeURIComponent('Data tidak ditemukan.'));
@@ -109,16 +110,17 @@ router.post('/:id/edit', requireWrite('surat_masuk'), upload.single('file'), (re
     file_original = req.file.originalname;
   }
 
-  db.prepare(
+  await run(
     `UPDATE surat_masuk SET nomor_surat=?, tanggal_masuk=?, asal_surat=?, perihal=?, penerima=?, file_path=?, file_original=?, updated_at=datetime('now','localtime')
-     WHERE id=?`
-  ).run(nomor_surat, tanggal_masuk, asal_surat, perihal, penerima, file_path, file_original, row.id);
+     WHERE id=?`,
+    [nomor_surat, tanggal_masuk, asal_surat, perihal, penerima, file_path, file_original, row.id]
+  );
 
   res.redirect('/surat-masuk?msg=' + encodeURIComponent('Surat masuk berhasil diperbarui.'));
 });
 
-router.post('/:id/delete', requireWrite('surat_masuk'), (req, res) => {
-  db.prepare(`UPDATE surat_masuk SET deleted_at=datetime('now','localtime') WHERE id=?`).run(req.params.id);
+router.post('/:id/delete', requireWrite('surat_masuk'), async (req, res) => {
+  await run(`UPDATE surat_masuk SET deleted_at=datetime('now','localtime') WHERE id=?`, [req.params.id]);
   res.redirect('/surat-masuk?msg=' + encodeURIComponent('Surat masuk diarsipkan.'));
 });
 

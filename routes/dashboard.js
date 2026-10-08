@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { db } = require('../db/database');
+const { get, all } = require('../db/pg');
 const BIDANG = require('../config/bidang');
 const { canAccess } = require('../config/permissions');
 
@@ -14,41 +14,41 @@ function currentMonthYear() {
   return { bulan, tahun, ym: `${tahun}-${bulan}` };
 }
 
-function buildStats() {
+async function buildStats() {
   const { ym } = currentMonthYear();
 
-  const suratMasukBulan = db.prepare(
-    "SELECT COUNT(*) c FROM surat_masuk WHERE deleted_at IS NULL AND strftime('%Y-%m', tanggal_masuk) = ?"
-  ).get(ym).c;
-  const suratMasukTotal = db.prepare(
+  const suratMasukBulan = Number((await get(
+    "SELECT COUNT(*) c FROM surat_masuk WHERE deleted_at IS NULL AND strftime('%Y-%m', tanggal_masuk) = ?", [ym]
+  )).c);
+  const suratMasukTotal = Number((await get(
     'SELECT COUNT(*) c FROM surat_masuk WHERE deleted_at IS NULL'
-  ).get().c;
-  const suratKeluarBulan = db.prepare(
-    "SELECT COUNT(*) c FROM surat_keluar WHERE deleted_at IS NULL AND strftime('%Y-%m', tanggal) = ?"
-  ).get(ym).c;
-  const suratKeluarTotal = db.prepare(
+  )).c);
+  const suratKeluarBulan = Number((await get(
+    "SELECT COUNT(*) c FROM surat_keluar WHERE deleted_at IS NULL AND strftime('%Y-%m', tanggal) = ?", [ym]
+  )).c);
+  const suratKeluarTotal = Number((await get(
     'SELECT COUNT(*) c FROM surat_keluar WHERE deleted_at IS NULL'
-  ).get().c;
+  )).c);
 
-  const pemasukanBulan = db.prepare(
-    "SELECT COALESCE(SUM(nominal),0) s FROM transaksi WHERE deleted_at IS NULL AND jenis='Pemasukan' AND strftime('%Y-%m', tanggal) = ?"
-  ).get(ym).s;
-  const pengeluaranBulan = db.prepare(
-    "SELECT COALESCE(SUM(nominal),0) s FROM transaksi WHERE deleted_at IS NULL AND jenis='Pengeluaran' AND strftime('%Y-%m', tanggal) = ?"
-  ).get(ym).s;
-  const pemasukanTotal = db.prepare(
+  const pemasukanBulan = Number((await get(
+    "SELECT COALESCE(SUM(nominal),0) s FROM transaksi WHERE deleted_at IS NULL AND jenis='Pemasukan' AND strftime('%Y-%m', tanggal) = ?", [ym]
+  )).s);
+  const pengeluaranBulan = Number((await get(
+    "SELECT COALESCE(SUM(nominal),0) s FROM transaksi WHERE deleted_at IS NULL AND jenis='Pengeluaran' AND strftime('%Y-%m', tanggal) = ?", [ym]
+  )).s);
+  const pemasukanTotal = Number((await get(
     "SELECT COALESCE(SUM(nominal),0) s FROM transaksi WHERE deleted_at IS NULL AND jenis='Pemasukan'"
-  ).get().s;
-  const pengeluaranTotal = db.prepare(
+  )).s);
+  const pengeluaranTotal = Number((await get(
     "SELECT COALESCE(SUM(nominal),0) s FROM transaksi WHERE deleted_at IS NULL AND jenis='Pengeluaran'"
-  ).get().s;
+  )).s);
 
-  const anggotaAktif = db.prepare(
+  const anggotaAktif = Number((await get(
     "SELECT COUNT(*) c FROM anggota WHERE deleted_at IS NULL AND status='Aktif'"
-  ).get().c;
-  const alumni = db.prepare(
+  )).c);
+  const alumni = Number((await get(
     "SELECT COUNT(*) c FROM anggota WHERE deleted_at IS NULL AND status='Alumni'"
-  ).get().c;
+  )).c);
 
   return {
     suratMasukBulan,
@@ -64,36 +64,37 @@ function buildStats() {
 }
 
 // Per-bidang program kerja counts: terlaksana (status 'selesai') vs tidak.
-function buildProgramStats(role) {
-  return BIDANG
-    .filter((b) => canAccess(role, b.module))
-    .map((b) => {
-      const terlaksana = db.prepare(
-        "SELECT COUNT(*) c FROM daftar_program WHERE deleted_at IS NULL AND bidang = ? AND status = 'selesai'"
-      ).get(b.key).c;
-      const tidakTerlaksana = db.prepare(
-        "SELECT COUNT(*) c FROM daftar_program WHERE deleted_at IS NULL AND bidang = ? AND status <> 'selesai'"
-      ).get(b.key).c;
-      return { label: b.label, terlaksana, tidakTerlaksana, total: terlaksana + tidakTerlaksana };
-    });
+async function buildProgramStats(role) {
+  const list = BIDANG.filter((b) => canAccess(role, b.module));
+  const out = [];
+  for (const b of list) {
+    const terlaksana = Number((await get(
+      "SELECT COUNT(*) c FROM daftar_program WHERE deleted_at IS NULL AND bidang = ? AND status = 'selesai'", [b.key]
+    )).c);
+    const tidakTerlaksana = Number((await get(
+      "SELECT COUNT(*) c FROM daftar_program WHERE deleted_at IS NULL AND bidang = ? AND status <> 'selesai'", [b.key]
+    )).c);
+    out.push({ label: b.label, terlaksana, tidakTerlaksana, total: terlaksana + tidakTerlaksana });
+  }
+  return out;
 }
 
-router.get('/', (req, res) => {
-  const stats = buildStats();
+router.get('/', async (req, res) => {
+  const stats = await buildStats();
   const role = req.session.user.role;
 
-  const suratTerbaru = db.prepare(
+  const suratTerbaru = await all(
     'SELECT * FROM surat_masuk WHERE deleted_at IS NULL ORDER BY tanggal_masuk DESC, id DESC LIMIT 5'
-  ).all();
-  const transaksiTerbaru = db.prepare(
+  );
+  const transaksiTerbaru = await all(
     'SELECT * FROM transaksi WHERE deleted_at IS NULL ORDER BY tanggal DESC, id DESC LIMIT 5'
-  ).all();
+  );
 
   res.render('dashboard', {
     title: 'Dashboard',
     stats,
     role,
-    programStats: buildProgramStats(role),
+    programStats: await buildProgramStats(role),
     suratTerbaru,
     transaksiTerbaru
   });

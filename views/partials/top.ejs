@@ -42,7 +42,8 @@
               <span><%= g.label %></span>
             </div>
             <% g.items.forEach(function(m) { %>
-              <a href="<%= m.href %>" class="nav-item nav-sub <%= currentPath.startsWith(m.href) ? 'active' : '' %>" onclick="closeSidebar()">
+              <% var isActive = currentPath.startsWith(m.href) || (m.match && m.match.some(function(p){ return currentPath.startsWith(p); })); %>
+              <a href="<%= m.href %>" class="nav-item nav-sub <%= isActive ? 'active' : '' %>" onclick="closeSidebar()">
                 <%- include('icon', { name: m.icon, cls: 'nav-icon' }) %>
                 <span><%= m.label %></span>
               </a>

@@ -2,7 +2,7 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireRole } = require('../middleware/auth');
 const BIDANG = require('../config/bidang');
 
@@ -15,7 +15,7 @@ const baseRoles = ['Admin', 'Ketua Umum', 'Sekretaris', 'Humas', 'Bendahara'];
 const bidangRoles = BIDANG.map((b) => b.role).filter((r) => !baseRoles.includes(r));
 const ROLES = [...baseRoles, ...bidangRoles];
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const q = (req.query.q || '').trim();
   const role = (req.query.role || '').trim();
 
@@ -30,7 +30,7 @@ router.get('/', (req, res) => {
     params.push(role);
   }
   sql += ' ORDER BY id ASC';
-  const users = db.prepare(sql).all(...params);
+  const users = await all(sql, params);
 
   res.render('users/index', {
     title: 'Manajemen User',
@@ -42,8 +42,8 @@ router.get('/', (req, res) => {
   });
 });
 
-router.get('/:id/detail', (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+router.get('/:id/detail', async (req, res) => {
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: 'User tidak ditemukan.' });
   res.json({
     id: user.id,
@@ -56,7 +56,7 @@ router.get('/:id/detail', (req, res) => {
   });
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const nama = (req.body.nama || '').trim();
   const username = (req.body.username || '').trim();
   const email = (req.body.email || '').trim() || null;
@@ -69,22 +69,23 @@ router.post('/', (req, res) => {
   if (!ROLES.includes(role)) {
     return res.redirect('/users?type=error&msg=' + encodeURIComponent('Role tidak valid.'));
   }
-  const exists = db.prepare('SELECT id FROM users WHERE username = ? OR (email IS NOT NULL AND email = ?)').get(username, email);
+  const exists = await get('SELECT id FROM users WHERE username = ? OR (email IS NOT NULL AND email = ?)', [username, email]);
   if (exists) {
     return res.redirect('/users?type=error&msg=' + encodeURIComponent('Username atau email sudah digunakan.'));
   }
 
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare(
+  await run(
     `INSERT INTO users (nama, username, email, password, role, status)
-     VALUES (?, ?, ?, ?, ?, 'Aktif')`
-  ).run(nama, username, email, hash, role);
+     VALUES (?, ?, ?, ?, ?, 'Aktif')`,
+    [nama, username, email, hash, role]
+  );
 
   res.redirect('/users?msg=' + encodeURIComponent('User berhasil ditambahkan.'));
 });
 
-router.post('/:id/edit', (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+router.post('/:id/edit', async (req, res) => {
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.redirect('/users?type=error&msg=' + encodeURIComponent('User tidak ditemukan.'));
 
   const nama = (req.body.nama || '').trim();
@@ -95,40 +96,42 @@ router.post('/:id/edit', (req, res) => {
   if (!nama || !username || !role || !ROLES.includes(role)) {
     return res.redirect('/users?type=error&msg=' + encodeURIComponent('Data tidak valid.'));
   }
-  const clash = db.prepare(
-    'SELECT id FROM users WHERE (username = ? OR (email IS NOT NULL AND email = ?)) AND id <> ?'
-  ).get(username, email, user.id);
+  const clash = await get(
+    'SELECT id FROM users WHERE (username = ? OR (email IS NOT NULL AND email = ?)) AND id <> ?',
+    [username, email, user.id]
+  );
   if (clash) {
     return res.redirect('/users?type=error&msg=' + encodeURIComponent('Username atau email sudah digunakan.'));
   }
 
-  db.prepare(
-    `UPDATE users SET nama=?, username=?, email=?, role=?, updated_at=datetime('now','localtime') WHERE id=?`
-  ).run(nama, username, email, role, user.id);
+  await run(
+    `UPDATE users SET nama=?, username=?, email=?, role=?, updated_at=datetime('now','localtime') WHERE id=?`,
+    [nama, username, email, role, user.id]
+  );
 
   res.redirect('/users?msg=' + encodeURIComponent('User berhasil diperbarui.'));
 });
 
-router.post('/:id/toggle', (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+router.post('/:id/toggle', async (req, res) => {
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.redirect('/users?type=error&msg=' + encodeURIComponent('User tidak ditemukan.'));
   if (user.id === req.session.user.id) {
     return res.redirect('/users?type=error&msg=' + encodeURIComponent('Tidak dapat menonaktifkan akun sendiri.'));
   }
   const next = user.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
-  db.prepare(`UPDATE users SET status=?, updated_at=datetime('now','localtime') WHERE id=?`).run(next, user.id);
+  await run(`UPDATE users SET status=?, updated_at=datetime('now','localtime') WHERE id=?`, [next, user.id]);
   res.redirect('/users?msg=' + encodeURIComponent(`Status user diubah menjadi ${next}.`));
 });
 
-router.post('/:id/reset-password', (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+router.post('/:id/reset-password', async (req, res) => {
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.redirect('/users?type=error&msg=' + encodeURIComponent('User tidak ditemukan.'));
   const newPass = req.body.password || '';
   if (newPass.length < 6) {
     return res.redirect('/users?type=error&msg=' + encodeURIComponent('Password minimal 6 karakter.'));
   }
   const hash = bcrypt.hashSync(newPass, 10);
-  db.prepare(`UPDATE users SET password=?, updated_at=datetime('now','localtime') WHERE id=?`).run(hash, user.id);
+  await run(`UPDATE users SET password=?, updated_at=datetime('now','localtime') WHERE id=?`, [hash, user.id]);
   res.redirect('/users?msg=' + encodeURIComponent('Password berhasil direset.'));
 });
 

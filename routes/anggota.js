@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 const { createUploader, removeFile } = require('../middleware/upload');
 
@@ -14,7 +14,7 @@ const uploadFields = upload.fields([
 
 router.use(requireAccess('anggota'));
 
-function buildList(req) {
+async function buildList(req) {
   const q = (req.query.q || '').trim();
   const angkatan = (req.query.angkatan || '').trim();
   const status = (req.query.status || 'Aktif').trim() === 'Keluar' ? 'Keluar' : 'Aktif';
@@ -30,35 +30,35 @@ function buildList(req) {
     params.push(angkatan);
   }
   // Ordinal ordering by angkatan: older (lower number) first, then by name.
-  sql += ' ORDER BY CAST(angkatan AS INTEGER) ASC, nama ASC';
-  return { rows: db.prepare(sql).all(...params), filters: { q, angkatan, status } };
+  sql += " ORDER BY NULLIF(regexp_replace(angkatan, '[^0-9]', '', 'g'), '')::int ASC NULLS LAST, nama ASC";
+  return { rows: await all(sql, params), filters: { q, angkatan, status } };
 }
 
-function distinctAngkatan() {
-  return db.prepare(
-    "SELECT DISTINCT angkatan FROM anggota WHERE deleted_at IS NULL AND angkatan IS NOT NULL AND angkatan <> '' ORDER BY CAST(angkatan AS INTEGER) DESC"
-  ).all().map((r) => r.angkatan);
+async function distinctAngkatan() {
+  return (await all(
+    "SELECT DISTINCT angkatan FROM anggota WHERE deleted_at IS NULL AND angkatan IS NOT NULL AND angkatan <> '' ORDER BY angkatan DESC"
+  )).map((r) => r.angkatan);
 }
 
-router.get('/', (req, res) => {
-  const { rows, filters } = buildList(req);
+router.get('/', async (req, res) => {
+  const { rows, filters } = await buildList(req);
   res.render('anggota/index', {
     title: 'Data Anggota Aktif',
     rows,
     filters,
-    angkatanList: distinctAngkatan(),
+    angkatanList: await distinctAngkatan(),
     flash: req.query.msg || null,
     flashType: req.query.type || 'success'
   });
 });
 
-router.get('/print', (req, res) => {
-  const { rows, filters } = buildList(req);
+router.get('/print', async (req, res) => {
+  const { rows, filters } = await buildList(req);
   res.render('anggota/print', { title: 'Cetak Data Anggota Aktif', layout: false, rows, filters });
 });
 
-router.get('/:id/detail', (req, res) => {
-  const row = db.prepare("SELECT * FROM anggota WHERE id = ? AND deleted_at IS NULL").get(req.params.id);
+router.get('/:id/detail', async (req, res) => {
+  const row = await get("SELECT * FROM anggota WHERE id = ? AND deleted_at IS NULL", [req.params.id]);
   if (!row) return res.status(404).json({ error: 'Data tidak ditemukan.' });
   res.json(row);
 });
@@ -105,7 +105,7 @@ function cleanupUploads(req) {
   if (bukti) removeFile('anggota/' + bukti.filename);
 }
 
-router.post('/', requireWrite('anggota'), uploadFields, (req, res) => {
+router.post('/', requireWrite('anggota'), uploadFields, async (req, res) => {
   const d = parseBody(req);
   const fotoFile = pickFile(req, 'foto');
   const buktiFile = pickFile(req, 'keluar_bukti');
@@ -123,19 +123,20 @@ router.post('/', requireWrite('anggota'), uploadFields, (req, res) => {
   const keluar_bukti_original = d.status === 'Keluar' && buktiFile ? buktiFile.originalname : null;
   if (d.status !== 'Keluar' && buktiFile) removeFile('anggota/' + buktiFile.filename);
 
-  db.prepare(
+  await run(
     `INSERT INTO anggota (nama, tempat_lahir, tanggal_lahir, kelas, alamat, no_hp, angkatan, nra, jabatan, foto_path, foto_original, status, keluar_bukti_path, keluar_bukti_original, catatan, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    d.nama, d.tempat_lahir, d.tanggal_lahir, JSON.stringify(d.kelas), d.alamat, d.no_hp, d.angkatan, d.nra,
-    JSON.stringify(d.jabatan), foto_path, foto_original, d.status, keluar_bukti_path, keluar_bukti_original, d.catatan, req.session.user.id
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      d.nama, d.tempat_lahir, d.tanggal_lahir, JSON.stringify(d.kelas), d.alamat, d.no_hp, d.angkatan, d.nra,
+      JSON.stringify(d.jabatan), foto_path, foto_original, d.status, keluar_bukti_path, keluar_bukti_original, d.catatan, req.session.user.id
+    ]
   );
 
   res.redirect('/anggota?msg=' + encodeURIComponent('Anggota berhasil ditambahkan.'));
 });
 
-router.post('/:id/edit', requireWrite('anggota'), uploadFields, (req, res) => {
-  const row = db.prepare("SELECT * FROM anggota WHERE id = ? AND deleted_at IS NULL").get(req.params.id);
+router.post('/:id/edit', requireWrite('anggota'), uploadFields, async (req, res) => {
+  const row = await get("SELECT * FROM anggota WHERE id = ? AND deleted_at IS NULL", [req.params.id]);
   if (!row) {
     cleanupUploads(req);
     return res.redirect('/anggota?type=error&msg=' + encodeURIComponent('Data tidak ditemukan.'));
@@ -176,35 +177,37 @@ router.post('/:id/edit', requireWrite('anggota'), uploadFields, (req, res) => {
     keluar_bukti_original = null;
   }
 
-  db.prepare(
+  await run(
     `UPDATE anggota SET nama=?, tempat_lahir=?, tanggal_lahir=?, kelas=?, alamat=?, no_hp=?, angkatan=?, nra=?, jabatan=?, foto_path=?, foto_original=?, status=?, keluar_bukti_path=?, keluar_bukti_original=?, catatan=?, updated_at=datetime('now','localtime')
-     WHERE id=?`
-  ).run(
-    d.nama, d.tempat_lahir, d.tanggal_lahir, JSON.stringify(d.kelas), d.alamat, d.no_hp, d.angkatan, d.nra,
-    JSON.stringify(d.jabatan), foto_path, foto_original, d.status, keluar_bukti_path, keluar_bukti_original, d.catatan, row.id
+     WHERE id=?`,
+    [
+      d.nama, d.tempat_lahir, d.tanggal_lahir, JSON.stringify(d.kelas), d.alamat, d.no_hp, d.angkatan, d.nra,
+      JSON.stringify(d.jabatan), foto_path, foto_original, d.status, keluar_bukti_path, keluar_bukti_original, d.catatan, row.id
+    ]
   );
 
   res.redirect('/anggota?msg=' + encodeURIComponent('Anggota berhasil diperbarui.'));
 });
 
-router.post('/:id/delete', requireWrite('anggota'), (req, res) => {
-  db.prepare(`UPDATE anggota SET deleted_at=datetime('now','localtime') WHERE id=?`).run(req.params.id);
+router.post('/:id/delete', requireWrite('anggota'), async (req, res) => {
+  await run(`UPDATE anggota SET deleted_at=datetime('now','localtime') WHERE id=?`, [req.params.id]);
   res.redirect('/anggota?msg=' + encodeURIComponent('Anggota dihapus.'));
 });
 
 // Promote an active member into Alumni without re-entering identity.
-router.post('/:id/to-alumni', requireWrite('anggota'), (req, res) => {
-  db.prepare(`UPDATE anggota SET status='Alumni', updated_at=datetime('now','localtime') WHERE id=? AND deleted_at IS NULL`).run(req.params.id);
+router.post('/:id/to-alumni', requireWrite('anggota'), async (req, res) => {
+  await run(`UPDATE anggota SET status='Alumni', updated_at=datetime('now','localtime') WHERE id=? AND deleted_at IS NULL`, [req.params.id]);
   res.redirect('/anggota?msg=' + encodeURIComponent('Anggota dipindahkan ke Alumni.'));
 });
 
 // Restore an exited member back to active; the exit proof is discarded.
-router.post('/:id/to-aktif', requireWrite('anggota'), (req, res) => {
-  const row = db.prepare("SELECT * FROM anggota WHERE id=? AND deleted_at IS NULL").get(req.params.id);
+router.post('/:id/to-aktif', requireWrite('anggota'), async (req, res) => {
+  const row = await get("SELECT * FROM anggota WHERE id=? AND deleted_at IS NULL", [req.params.id]);
   if (row && row.keluar_bukti_path) removeFile(row.keluar_bukti_path);
-  db.prepare(
-    `UPDATE anggota SET status='Aktif', keluar_bukti_path=NULL, keluar_bukti_original=NULL, updated_at=datetime('now','localtime') WHERE id=? AND deleted_at IS NULL`
-  ).run(req.params.id);
+  await run(
+    `UPDATE anggota SET status='Aktif', keluar_bukti_path=NULL, keluar_bukti_original=NULL, updated_at=datetime('now','localtime') WHERE id=? AND deleted_at IS NULL`,
+    [req.params.id]
+  );
   res.redirect('/anggota?type=success&msg=' + encodeURIComponent('Anggota diaktifkan kembali.'));
 });
 
