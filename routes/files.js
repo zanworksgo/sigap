@@ -2,8 +2,7 @@
 
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const { UPLOAD_ROOT } = require('../middleware/upload');
+const { downloadBuffer } = require('../db/storage');
 const { canAccess } = require('../config/permissions');
 
 const router = express.Router();
@@ -22,12 +21,11 @@ const CATEGORY_MODULE = {
   'keuangan-panitia': 'keuangan_panitia'
 };
 
-// Serve an uploaded file only if the user's role may access its module.
-// disposition=attachment forces a download; otherwise inline preview.
-router.get('/*', (req, res) => {
+// Serve an uploaded file from Supabase Storage only if the user's role may access
+// its module. download=1 forces a download; otherwise inline preview.
+router.get('/*', async (req, res) => {
   const rel = req.params[0] || '';
 
-  // Prevent path traversal before touching the filesystem.
   if (rel.includes('..') || rel.includes('\\')) {
     return res.status(400).send('Nama file tidak valid.');
   }
@@ -43,11 +41,9 @@ router.get('/*', (req, res) => {
     return res.status(403).send('Anda tidak memiliki akses ke file ini.');
   }
 
-  const filename = parts[parts.length - 1];
-  const full = path.join(UPLOAD_ROOT, ...parts);
-  if (!full.startsWith(UPLOAD_ROOT) || !fs.existsSync(full)) {
-    return res.status(404).send('File tidak ditemukan.');
-  }
+  const key = parts.join('/');
+  const buffer = await downloadBuffer(key);
+  if (!buffer) return res.status(404).send('File tidak ditemukan.');
 
   const MIME = {
     '.pdf': 'application/pdf',
@@ -56,14 +52,12 @@ router.get('/*', (req, res) => {
     '.png': 'image/png',
     '.webp': 'image/webp'
   };
+  const filename = parts[parts.length - 1];
   const ext = path.extname(filename).toLowerCase();
   res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
-  if (req.query.download === '1') {
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  } else {
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-  }
-  fs.createReadStream(full).pipe(res);
+  const disp = req.query.download === '1' ? 'attachment' : 'inline';
+  res.setHeader('Content-Disposition', `${disp}; filename="${filename}"`);
+  res.send(buffer);
 });
 
 module.exports = router;
