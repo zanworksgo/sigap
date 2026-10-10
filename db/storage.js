@@ -9,7 +9,7 @@ const { createClient } = require('@supabase/supabase-js');
 // supabase-js initialises a realtime client that needs a global WebSocket.
 // Node < 22 has none, so polyfill with `ws` (we only use Storage here).
 if (!globalThis.WebSocket) {
-  try { globalThis.WebSocket = require('ws'); } catch { /* optional */ }
+    try { globalThis.WebSocket = require('ws'); } catch { /* optional */ }
 }
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
@@ -18,52 +18,52 @@ const BUCKET = (process.env.SUPABASE_BUCKET || 'uploads').trim();
 
 const CONFIGURED = !!(SUPABASE_URL && SERVICE_KEY);
 if (!CONFIGURED) {
-  console.warn('PERINGATAN: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum di-set; fitur upload/file nonaktif.');
+    console.warn('PERINGATAN: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY belum di-set; fitur upload/file nonaktif.');
 }
 
 // Only build the client when configured, so a missing key never crashes boot.
 const supabase = CONFIGURED
-  ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
-  : null;
+    ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
+    : null;
 
 // Create the (private) bucket once if it doesn't exist yet.
 async function initStorage() {
-  if (!CONFIGURED) return;
-  try {
-    const { data } = await supabase.storage.getBucket(BUCKET);
-    if (!data) {
-      await supabase.storage.createBucket(BUCKET, { public: false });
-      console.log(`Bucket Storage "${BUCKET}" dibuat.`);
+    if (!CONFIGURED) return;
+    try {
+        const { data } = await supabase.storage.getBucket(BUCKET);
+        if (!data) {
+            await supabase.storage.createBucket(BUCKET, { public: false });
+            console.log(`Bucket Storage "${BUCKET}" dibuat.`);
+        }
+    } catch (e) {
+        // createBucket throws if it already exists; ignore that case.
+        if (!/already exists/i.test(e.message || '')) {
+            console.warn('initStorage:', e.message);
+        }
     }
-  } catch (e) {
-    // createBucket throws if it already exists; ignore that case.
-    if (!/already exists/i.test(e.message || '')) {
-      console.warn('initStorage:', e.message);
-    }
-  }
 }
 
 async function uploadBuffer(key, buffer, contentType) {
-  if (!CONFIGURED) throw new Error('Supabase Storage belum dikonfigurasi di server.');
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(key, buffer, { contentType: contentType || 'application/octet-stream', upsert: true });
-  if (error) throw error;
-  return key;
+    if (!CONFIGURED) throw new Error('Supabase Storage belum dikonfigurasi di server.');
+    const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(key, buffer, { contentType: contentType || 'application/octet-stream', upsert: true });
+    if (error) throw error;
+    return key;
 }
 
 // Returns a Node Buffer for the object, or null if it does not exist.
 async function downloadBuffer(key) {
-  if (!CONFIGURED) return null;
-  const { data, error } = await supabase.storage.from(BUCKET).download(key);
-  if (error || !data) return null;
-  return Buffer.from(await data.arrayBuffer());
+    if (!CONFIGURED) return null;
+    const { data, error } = await supabase.storage.from(BUCKET).download(key);
+    if (error || !data) return null;
+    return Buffer.from(await data.arrayBuffer());
 }
 
 async function removeObject(key) {
-  if (!CONFIGURED || !key) return;
-  const clean = key.replace(/^uploads[\\/]/, '');
-  await supabase.storage.from(BUCKET).remove([clean]).catch(() => {});
+    if (!CONFIGURED || !key) return;
+    const clean = key.replace(/^uploads[\\/]/, '');
+    await supabase.storage.from(BUCKET).remove([clean]).catch(() => { });
 }
 
 module.exports = { supabase, BUCKET, initStorage, uploadBuffer, downloadBuffer, removeObject };

@@ -13,54 +13,54 @@ const ALL_ROLES = [...BASE_ROLES, ...BIDANG.map((b) => b.role).filter((r) => !BA
 const ROLE_CHECK = ALL_ROLES.map((r) => `'${String(r).replace(/'/g, "''")}'`).join(',');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: Number(process.env.PG_POOL_MAX || 5),
-  ssl: { rejectUnauthorized: false }
+    connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.PG_POOL_MAX || 5),
+    ssl: { rejectUnauthorized: false }
 });
 
 // Fallback: ensure each new connection resolves unqualified names in our schema.
 // (The durable fix is the ALTER ROLE ... SET search_path applied in init().)
 pool.on('connect', (client) => {
-  client.query(`SET search_path TO ${SCHEMA}, public`).catch(() => {});
+    client.query(`SET search_path TO ${SCHEMA}, public`).catch(() => { });
 });
 
 // Translate the SQLite dialect used across the app into PostgreSQL.
 function translate(sql) {
-  let text = sql;
-  text = text.replace(
-    /datetime\('now',\s*'localtime'\)/gi,
-    "to_char(now() AT TIME ZONE 'Asia/Makassar','YYYY-MM-DD HH24:MI:SS')"
-  );
-  text = text.replace(/strftime\('%Y-%m',\s*([^)]+)\)/gi, "to_char(($1)::timestamp,'YYYY-MM')");
-  text = text.replace(/strftime\('%m',\s*([^)]+)\)/gi, "to_char(($1)::timestamp,'MM')");
-  text = text.replace(/strftime\('%Y',\s*([^)]+)\)/gi, "to_char(($1)::timestamp,'YYYY')");
-  // SQLite LIKE is case-insensitive; ILIKE preserves that behaviour in Postgres.
-  text = text.replace(/\bLIKE\b/gi, 'ILIKE');
-  // Positional params: ? -> $1, $2, ...
-  let i = 0;
-  text = text.replace(/\?/g, () => '$' + ++i);
-  return text;
+    let text = sql;
+    text = text.replace(
+        /datetime\('now',\s*'localtime'\)/gi,
+        "to_char(now() AT TIME ZONE 'Asia/Makassar','YYYY-MM-DD HH24:MI:SS')"
+    );
+    text = text.replace(/strftime\('%Y-%m',\s*([^)]+)\)/gi, "to_char(($1)::timestamp,'YYYY-MM')");
+    text = text.replace(/strftime\('%m',\s*([^)]+)\)/gi, "to_char(($1)::timestamp,'MM')");
+    text = text.replace(/strftime\('%Y',\s*([^)]+)\)/gi, "to_char(($1)::timestamp,'YYYY')");
+    // SQLite LIKE is case-insensitive; ILIKE preserves that behaviour in Postgres.
+    text = text.replace(/\bLIKE\b/gi, 'ILIKE');
+    // Positional params: ? -> $1, $2, ...
+    let i = 0;
+    text = text.replace(/\?/g, () => '$' + ++i);
+    return text;
 }
 
 async function all(sql, params = []) {
-  const res = await pool.query(translate(sql), params);
-  return res.rows;
+    const res = await pool.query(translate(sql), params);
+    return res.rows;
 }
 
 async function get(sql, params = []) {
-  const res = await pool.query(translate(sql), params);
-  return res.rows[0];
+    const res = await pool.query(translate(sql), params);
+    return res.rows[0];
 }
 
 async function run(sql, params = []) {
-  const res = await pool.query(translate(sql), params);
-  return { changes: res.rowCount, rows: res.rows };
+    const res = await pool.query(translate(sql), params);
+    return { changes: res.rowCount, rows: res.rows };
 }
 
 const TIMESTAMP_DEFAULT = "to_char(now() AT TIME ZONE 'Asia/Makassar','YYYY-MM-DD HH24:MI:SS')";
 
 async function init() {
-  await pool.query(`
+    await pool.query(`
     CREATE SCHEMA IF NOT EXISTS ${SCHEMA};
     SET search_path TO ${SCHEMA}, public;
 
@@ -234,14 +234,14 @@ async function init() {
       ON surat_keluar(nomor_surat) WHERE deleted_at IS NULL;
   `);
 
-  // Durable, pooler-independent search_path so unqualified table names always
-  // resolve to our schema (the connection `options` param is not honoured by
-  // some Supabase pooler modes).
-  try {
-    await pool.query(`ALTER ROLE CURRENT_USER SET search_path TO ${SCHEMA}, public`);
-  } catch (e) {
-    console.warn('Catatan: gagal ALTER ROLE search_path (pakai fallback on-connect):', e.message);
-  }
+    // Durable, pooler-independent search_path so unqualified table names always
+    // resolve to our schema (the connection `options` param is not honoured by
+    // some Supabase pooler modes).
+    try {
+        await pool.query(`ALTER ROLE CURRENT_USER SET search_path TO ${SCHEMA}, public`);
+    } catch (e) {
+        console.warn('Catatan: gagal ALTER ROLE search_path (pakai fallback on-connect):', e.message);
+    }
 }
 
 module.exports = { pool, init, all, get, run, translate, SCHEMA, ALL_ROLES };

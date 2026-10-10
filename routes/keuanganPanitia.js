@@ -117,10 +117,10 @@ function keuanganPanitiaRouter(panitia) {
         const bukti_original = req.file ? req.file.originalname : null;
 
         await run(
-      `INSERT INTO transaksi_panitia (kepanitiaan, jenis, tanggal, uraian, nominal, keterangan, bukti_path, bukti_original, created_by)
+            `INSERT INTO transaksi_panitia (kepanitiaan, jenis, tanggal, uraian, nominal, keterangan, bukti_path, bukti_original, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [panitia.key, d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, req.session.user.id]
-    );
+            [panitia.key, d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, req.session.user.id]
+        );
         res.redirect(`${base}?msg=` + encodeURIComponent('Transaksi berhasil ditambahkan.'));
     });
 
@@ -146,10 +146,10 @@ function keuanganPanitiaRouter(panitia) {
         }
 
         await run(
-      `UPDATE transaksi_panitia SET jenis=?, tanggal=?, uraian=?, nominal=?, keterangan=?, bukti_path=?, bukti_original=?, updated_at=datetime('now','localtime')
+            `UPDATE transaksi_panitia SET jenis=?, tanggal=?, uraian=?, nominal=?, keterangan=?, bukti_path=?, bukti_original=?, updated_at=datetime('now','localtime')
        WHERE id=?`,
-      [d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, row.id]
-    );
+            [d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, row.id]
+        );
         res.redirect(`${base}?msg=` + encodeURIComponent('Transaksi berhasil diperbarui.'));
     });
 
