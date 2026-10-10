@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><%= title %> · <%= appName %></title>
   <link rel="stylesheet" href="/css/style.css" />
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#E50914" />
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SIGAP" />
   <script>(function () { var t = localStorage.getItem('sigap-theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();</script>
 </head>
 <body>
@@ -39,6 +45,10 @@
         <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Masuk</button>
       </form>
 
+      <button type="button" id="installBtn" class="btn" style="width:100%;justify-content:center;margin-top:12px;display:none;">
+        <%- include('partials/icon', { name: 'download' }) %> Install Aplikasi
+      </button>
+
       <div class="help-cred"><%- copyright %></div>
     </div>
   </div>
@@ -51,6 +61,34 @@
       document.querySelector('[data-pw-show]').style.display = show ? 'none' : '';
       document.querySelector('[data-pw-hide]').style.display = show ? '' : 'none';
     }
+
+    // PWA install button: show only when the browser allows installation.
+    (function () {
+      var deferredPrompt = null;
+      var btn = document.getElementById('installBtn');
+      var installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (!installed && btn) btn.style.display = '';
+      });
+
+      if (btn) {
+        btn.addEventListener('click', function () {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.finally(function () {
+            deferredPrompt = null;
+            btn.style.display = 'none';
+          });
+        });
+      }
+
+      window.addEventListener('appinstalled', function () {
+        if (btn) btn.style.display = 'none';
+      });
+    })();
   </script>
   <% if (typeof liveReload !== 'undefined' && liveReload) { %>
     <script>document.write('<script src="//' + location.hostname + ':35729/livereload.js?snipver=1"><\/script>');</script>

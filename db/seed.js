@@ -1,10 +1,11 @@
 'use strict';
 
-// Seed script: creates default users for SIGAP.
-require('dotenv').config();
+// Seed script: creates default users and sample data for SIGAP.
 const bcrypt = require('bcryptjs');
-const { init, run } = require('./pg');
+const { db, init } = require('./database');
 const BIDANG = require('../config/bidang');
+
+init();
 
 const defaultPassword = 'password123';
 const hash = bcrypt.hashSync(defaultPassword, 10);
@@ -24,15 +25,19 @@ BIDANG.forEach((b) => {
   users.push({ nama: b.role, username: uname, email: uname + '@sigap.id', role: b.role });
 });
 
-async function seed({ log = true } = {}) {
-  for (const u of users) {
-    await run(
-      `INSERT INTO users (nama, username, email, password, role, status)
-       VALUES (?, ?, ?, ?, ?, 'Aktif')
-       ON CONFLICT DO NOTHING`,
-      [u.nama, u.username, u.email, hash, u.role]
-    );
+const insertUser = db.prepare(
+  `INSERT OR IGNORE INTO users (nama, username, email, password, role, status)
+   VALUES (@nama, @username, @email, @password, @role, 'Aktif')`
+);
+
+const seedUsers = db.transaction((list) => {
+  for (const u of list) {
+    insertUser.run({ ...u, password: hash });
   }
+});
+
+function seed({ log = true } = {}) {
+  seedUsers(users);
   if (!log) return;
   console.log('Seed selesai. Akun default (password: %s):', defaultPassword);
   for (const u of users) {
@@ -41,14 +46,8 @@ async function seed({ log = true } = {}) {
 }
 
 if (require.main === module) {
-  (async () => {
-    await init();
-    await seed();
-    process.exit(0);
-  })().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  seed();
+  process.exit(0);
 }
 
 module.exports = { seed };

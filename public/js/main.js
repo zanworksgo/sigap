@@ -43,6 +43,13 @@ function closeModal(id) {
 if (!window.__sigapBound) {
   window.__sigapBound = true;
 
+  // Register the PWA service worker (enables install / app-like mode).
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+
   document.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal-backdrop')) {
       e.target.classList.remove('open');

@@ -2,38 +2,74 @@
 
 const express = require('express');
 const path = require('path');
-const { downloadBuffer } = require('../db/storage');
+const fs = require('fs');
+const { UPLOAD_ROOT } = require('../middleware/upload');
 const { canAccess } = require('../config/permissions');
 
 const router = express.Router();
 
-// Map upload subfolder -> module required to view the file. The first path
-// segment is the category; files may live in a nested folder (e.g. per
-// kepanitiaan): keuangan-panitia/<slug>/<filename>.
+// Map upload subfolder -> module required to view the file.
 const CATEGORY_MODULE = {
   'surat-masuk': 'surat_masuk',
   'surat-keluar': 'surat_keluar',
   'pemasukan': 'pemasukan',
   'pengeluaran': 'pengeluaran',
-  'anggota': 'anggota',
-  'surat-masuk-panitia': 'surat_panitia',
-  'surat-keluar-panitia': 'surat_panitia',
-  'keuangan-panitia': 'keuangan_panitia'
+  'anggota': 'anggota'
 };
 
-// Serve an uploaded file from Supabase Storage only if the user's role may access
-// its module. download=1 forces a download; otherwise inline preview.
-router.get('/*', async (req, res) => {
-  const rel = req.params[0] || '';
+// Committee archives are stored one level deeper: <category>/<slug>/<filename>.
+const PANITIA_CATEGORY = {
+  'surat-masuk-panitia': 'surat_panitia',
+  'surat-keluar-panitia': 'surat_panitia'
+};
 
-  if (rel.includes('..') || rel.includes('\\')) {
+const MIME = {
+  '.pdf': 'application/pdf',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp'
+};
+
+function isUnsafeSegment(s) {
+  return !s || s.includes('/') || s.includes('\\') || s.includes('..');
+}
+
+function sendFile(req, res, full, filename) {
+  if (!full.startsWith(UPLOAD_ROOT) || !fs.existsSync(full)) {
+    return res.status(404).send('File tidak ditemukan.');
+  }
+  const ext = path.extname(filename).toLowerCase();
+  res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
+  if (req.query.download === '1') {
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  } else {
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  }
+  fs.createReadStream(full).pipe(res);
+}
+
+// Serve a committee-archive file: /file/<category>/<slug>/<filename>.
+router.get('/:category/:slug/:filename', (req, res) => {
+  const { category, slug, filename } = req.params;
+  const mod = PANITIA_CATEGORY[category];
+  if (!mod) return res.status(404).send('File tidak ditemukan.');
+
+  if (!canAccess(req.session.user.role, mod)) {
+    return res.status(403).send('Anda tidak memiliki akses ke file ini.');
+  }
+
+  if (isUnsafeSegment(slug) || isUnsafeSegment(filename)) {
     return res.status(400).send('Nama file tidak valid.');
   }
 
-  const parts = rel.split('/').filter(Boolean);
-  if (parts.length < 2) return res.status(404).send('File tidak ditemukan.');
+  sendFile(req, res, path.join(UPLOAD_ROOT, category, slug, filename), filename);
+});
 
-  const category = parts[0];
+// Serve an uploaded file only if the user's role may access its module.
+// disposition=attachment forces a download; otherwise inline preview.
+router.get('/:category/:filename', (req, res) => {
+  const { category, filename } = req.params;
   const mod = CATEGORY_MODULE[category];
   if (!mod) return res.status(404).send('File tidak ditemukan.');
 
@@ -41,23 +77,12 @@ router.get('/*', async (req, res) => {
     return res.status(403).send('Anda tidak memiliki akses ke file ini.');
   }
 
-  const key = parts.join('/');
-  const buffer = await downloadBuffer(key);
-  if (!buffer) return res.status(404).send('File tidak ditemukan.');
+  // Prevent path traversal: only allow a bare filename.
+  if (isUnsafeSegment(filename)) {
+    return res.status(400).send('Nama file tidak valid.');
+  }
 
-  const MIME = {
-    '.pdf': 'application/pdf',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.webp': 'image/webp'
-  };
-  const filename = parts[parts.length - 1];
-  const ext = path.extname(filename).toLowerCase();
-  res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
-  const disp = req.query.download === '1' ? 'attachment' : 'inline';
-  res.setHeader('Content-Disposition', `${disp}; filename="${filename}"`);
-  res.send(buffer);
+  sendFile(req, res, path.join(UPLOAD_ROOT, category, filename), filename);
 });
 
 module.exports = router;

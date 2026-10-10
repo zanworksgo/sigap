@@ -1,9 +1,11 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
-const { uploadBuffer, removeObject } = require('../db/storage');
+
+const UPLOAD_ROOT = process.env.UPLOAD_ROOT || path.join(__dirname, '..', 'uploads');
 
 const ALLOWED = {
   '.pdf': ['application/pdf'],
@@ -12,6 +14,19 @@ const ALLOWED = {
   '.png': ['image/png'],
   '.webp': ['image/webp']
 };
+
+function makeStorage(subdir) {
+  const dest = path.join(UPLOAD_ROOT, subdir);
+  fs.mkdirSync(dest, { recursive: true });
+  return multer.diskStorage({
+    destination: (req, file, cb) => cb(null, dest),
+    filename: (req, file, cb) => {
+      const unique = crypto.randomBytes(8).toString('hex');
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}-${unique}${ALLOWED[ext] ? ext : '.pdf'}`);
+    }
+  });
+}
 
 // Accept only PDF or image files, validated by extension AND mimetype.
 function pdfFilter(req, file, cb) {
@@ -23,55 +38,38 @@ function pdfFilter(req, file, cb) {
   cb(null, true);
 }
 
-function makeFilename(originalname) {
-  const unique = crypto.randomBytes(8).toString('hex');
-  const ext = path.extname(originalname).toLowerCase();
-  return `${Date.now()}-${unique}${ALLOWED[ext] ? ext : '.pdf'}`;
-}
-
-function redirectErr(req, res, err) {
-  let msg = err.message || 'Gagal mengunggah file.';
-  if (err.code === 'LIMIT_FILE_SIZE') msg = 'Ukuran file melebihi 5 MB.';
-  return res.redirect(`${req.baseUrl}?type=error&msg=` + encodeURIComponent(msg));
-}
-
-// Uploader for a given subdir (becomes the object-key prefix in Storage, e.g.
-// "anggota" or "surat-masuk-panitia/<slug>"). Files are buffered in memory then
-// pushed to Supabase Storage; req.file(.filename) keeps the previous shape so
-// route handlers need no changes.
 function createUploader(subdir) {
   const uploader = multer({
-    storage: multer.memoryStorage(),
+    storage: makeStorage(subdir),
     fileFilter: pdfFilter,
     limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
   });
 
-  async function pushFile(file) {
-    const filename = makeFilename(file.originalname);
-    await uploadBuffer(`${subdir}/${filename}`, file.buffer, file.mimetype);
-    file.filename = filename;
-  }
-
+  // Wrap multer.single so upload/validation errors redirect back with a
+  // friendly message instead of surfacing a raw 500.
   const originalSingle = uploader.single.bind(uploader);
   uploader.single = function (field) {
     const mw = originalSingle(field);
     return function (req, res, next) {
       mw(req, res, (err) => {
-        if (err) return redirectErr(req, res, err);
-        if (!req.file) return next();
-        pushFile(req.file).then(() => next()).catch((e) => redirectErr(req, res, e));
+        if (!err) return next();
+        let msg = err.message || 'Gagal mengunggah file.';
+        if (err.code === 'LIMIT_FILE_SIZE') msg = 'Ukuran file melebihi 5 MB.';
+        return res.redirect(`${req.baseUrl}?type=error&msg=` + encodeURIComponent(msg));
       });
     };
   };
 
+  // Same friendly-error wrapper for multi-field uploads (e.g. foto + bukti).
   const originalFields = uploader.fields.bind(uploader);
   uploader.fields = function (fields) {
     const mw = originalFields(fields);
     return function (req, res, next) {
       mw(req, res, (err) => {
-        if (err) return redirectErr(req, res, err);
-        const files = req.files ? Object.values(req.files).flat() : [];
-        Promise.all(files.map(pushFile)).then(() => next()).catch((e) => redirectErr(req, res, e));
+        if (!err) return next();
+        let msg = err.message || 'Gagal mengunggah file.';
+        if (err.code === 'LIMIT_FILE_SIZE') msg = 'Ukuran file melebihi 5 MB.';
+        return res.redirect(`${req.baseUrl}?type=error&msg=` + encodeURIComponent(msg));
       });
     };
   };
@@ -81,8 +79,8 @@ function createUploader(subdir) {
 
 function removeFile(relPath) {
   if (!relPath) return;
-  removeObject(relPath);
+  const full = path.join(UPLOAD_ROOT, relPath.replace(/^uploads[\\/]/, ''));
+  fs.promises.unlink(full).catch(() => { });
 }
 
-module.exports = { createUploader, removeFile };
-
+module.exports = { createUploader, removeFile, UPLOAD_ROOT };

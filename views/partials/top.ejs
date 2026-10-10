@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><%= title %> · <%= appName %></title>
   <link rel="stylesheet" href="/css/style.css" />
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#E50914" />
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="SIGAP" />
   <script>
     // Apply saved theme before paint to avoid flash.
     (function () { var t = localStorage.getItem('sigap-theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();
@@ -42,8 +48,7 @@
               <span><%= g.label %></span>
             </div>
             <% g.items.forEach(function(m) { %>
-              <% var isActive = currentPath.startsWith(m.href) || (m.match && m.match.some(function(p){ return currentPath.startsWith(p); })); %>
-              <a href="<%= m.href %>" class="nav-item nav-sub <%= isActive ? 'active' : '' %>" onclick="closeSidebar()">
+              <a href="<%= m.href %>" class="nav-item nav-sub <%= currentPath.startsWith(m.href) ? 'active' : '' %>" onclick="closeSidebar()">
                 <%- include('icon', { name: m.icon, cls: 'nav-icon' }) %>
                 <span><%= m.label %></span>
               </a>
