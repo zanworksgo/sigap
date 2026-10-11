@@ -12,6 +12,7 @@ const router = express.Router();
 const CATEGORY_MODULE = {
   'surat-masuk': 'surat_masuk',
   'surat-keluar': 'surat_keluar',
+  'sertifikat': 'sertifikat',
   'pemasukan': 'pemasukan',
   'pengeluaran': 'pengeluaran',
   'anggota': 'anggota'

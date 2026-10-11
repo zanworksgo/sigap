@@ -105,6 +105,20 @@ async function init() {
       deleted_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS sertifikat (
+      id SERIAL PRIMARY KEY,
+      nomor_sertifikat TEXT NOT NULL,
+      perihal TEXT NOT NULL,
+      penerima TEXT NOT NULL,
+      tanggal TEXT NOT NULL,
+      file_path TEXT,
+      file_original TEXT,
+      created_by INTEGER REFERENCES users(id),
+      created_at TEXT NOT NULL DEFAULT ${TIMESTAMP_DEFAULT},
+      updated_at TEXT NOT NULL DEFAULT ${TIMESTAMP_DEFAULT},
+      deleted_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS anggota (
       id SERIAL PRIMARY KEY,
       nama TEXT NOT NULL,

@@ -12,6 +12,7 @@ const MODULES = {
   surat_masuk: 'Surat Masuk',
   surat_keluar: 'Surat Keluar',
   kode_surat: 'Aturan Surat',
+  sertifikat: 'Sertifikat',
   surat_panitia: 'Surat Kepanitiaan',
   anggota: 'Data Anggota Aktif',
   alumni: 'Data Alumni',
@@ -26,17 +27,17 @@ const MODULES = {
 // write:  modules a role may CREATE/UPDATE/DELETE.
 const ROLE_ACCESS = {
   Admin: {
-    access: ['dashboard', 'users', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
-    write: ['users', 'surat_masuk', 'surat_keluar', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'keuangan_panitia']
+    access: ['dashboard', 'users', 'surat_masuk', 'surat_keluar', 'kode_surat', 'sertifikat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
+    write: ['users', 'surat_masuk', 'surat_keluar', 'sertifikat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'keuangan_panitia']
   },
   'Ketua Umum': {
     // Read-only monitoring across all administrative modules, grouped per jabatan.
-    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
+    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'sertifikat', 'surat_panitia', 'anggota', 'alumni', 'dokumentasi', 'pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'],
     write: []
   },
   Sekretaris: {
-    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'surat_panitia'],
-    write: ['surat_masuk', 'surat_keluar', 'surat_panitia']
+    access: ['dashboard', 'surat_masuk', 'surat_keluar', 'kode_surat', 'sertifikat', 'surat_panitia'],
+    write: ['surat_masuk', 'surat_keluar', 'sertifikat', 'surat_panitia']
   },
   Humas: {
     access: ['dashboard', 'anggota', 'alumni', 'dokumentasi'],
@@ -51,7 +52,7 @@ const ROLE_ACCESS = {
 // Jabatan groupings used to render the Ketua Umum sidebar grouped by role.
 // Each group lists the MENU keys the jabatan manages.
 const JABATAN_GROUPS = [
-  { key: 'sekretaris', label: 'Sekretaris', icon: 'send', modules: ['surat_masuk', 'surat_keluar', 'kode_surat'] },
+  { key: 'sekretaris', label: 'Sekretaris', icon: 'send', modules: ['surat_masuk', 'surat_keluar', 'kode_surat', 'sertifikat'] },
   { key: 'humas', label: 'Humas', icon: 'user-check', modules: ['anggota', 'alumni', 'dokumentasi'] },
   { key: 'bendahara', label: 'Bendahara', icon: 'wallet', modules: ['pemasukan', 'pengeluaran', 'laporan', 'keuangan_panitia'] }
 ];
