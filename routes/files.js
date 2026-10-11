@@ -2,8 +2,7 @@
 
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const { UPLOAD_ROOT } = require('../middleware/upload');
+const { downloadBuffer } = require('../db/storage');
 const { canAccess } = require('../config/permissions');
 
 const router = express.Router();
@@ -36,22 +35,19 @@ function isUnsafeSegment(s) {
   return !s || s.includes('/') || s.includes('\\') || s.includes('..');
 }
 
-function sendFile(req, res, full, filename) {
-  if (!full.startsWith(UPLOAD_ROOT) || !fs.existsSync(full)) {
-    return res.status(404).send('File tidak ditemukan.');
-  }
+// Stream an object from Supabase Storage with the right headers.
+async function sendObject(req, res, key, filename) {
+  const buf = await downloadBuffer(key);
+  if (!buf) return res.status(404).send('File tidak ditemukan.');
   const ext = path.extname(filename).toLowerCase();
   res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
-  if (req.query.download === '1') {
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  } else {
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-  }
-  fs.createReadStream(full).pipe(res);
+  const disp = req.query.download === '1' ? 'attachment' : 'inline';
+  res.setHeader('Content-Disposition', `${disp}; filename="${filename}"`);
+  res.send(buf);
 }
 
 // Serve a committee-archive file: /file/<category>/<slug>/<filename>.
-router.get('/:category/:slug/:filename', (req, res) => {
+router.get('/:category/:slug/:filename', async (req, res) => {
   const { category, slug, filename } = req.params;
   const mod = PANITIA_CATEGORY[category];
   if (!mod) return res.status(404).send('File tidak ditemukan.');
@@ -64,12 +60,12 @@ router.get('/:category/:slug/:filename', (req, res) => {
     return res.status(400).send('Nama file tidak valid.');
   }
 
-  sendFile(req, res, path.join(UPLOAD_ROOT, category, slug, filename), filename);
+  await sendObject(req, res, `${category}/${slug}/${filename}`, filename);
 });
 
 // Serve an uploaded file only if the user's role may access its module.
 // disposition=attachment forces a download; otherwise inline preview.
-router.get('/:category/:filename', (req, res) => {
+router.get('/:category/:filename', async (req, res) => {
   const { category, filename } = req.params;
   const mod = CATEGORY_MODULE[category];
   if (!mod) return res.status(404).send('File tidak ditemukan.');
@@ -83,7 +79,7 @@ router.get('/:category/:filename', (req, res) => {
     return res.status(400).send('Nama file tidak valid.');
   }
 
-  sendFile(req, res, path.join(UPLOAD_ROOT, category, filename), filename);
+  await sendObject(req, res, `${category}/${filename}`, filename);
 });
 
 module.exports = router;
