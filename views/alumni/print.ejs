@@ -30,13 +30,13 @@
       <% rows.forEach(function(r, i) { %>
         <tr>
           <td class="text-center"><%= i + 1 %></td>
-          <td><%= r.nama %></td>
+          <td><%= fmt.toUpper(r.nama) %></td>
           <td><%= r.nra || '-' %></td>
           <td><%= r.angkatan || '-' %></td>
           <td><%= fmt.formatTTL(r.tempat_lahir, r.tanggal_lahir) %></td>
           <td><%= fmt.formatLast(r.kelas) %></td>
           <td><%= fmt.formatLast(r.jabatan) %></td>
-          <td><%= r.alamat %></td>
+          <td><%= fmt.titleCase(r.alamat) %></td>
           <td><%= r.no_hp %></td>
         </tr>
       <% }); %>

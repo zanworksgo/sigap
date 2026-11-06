@@ -51,7 +51,7 @@
                 <span class="anggota-thumb anggota-thumb-empty"><%= r.nama.charAt(0).toUpperCase() %></span>
               <% } %>
             </td>
-            <td><b><%= r.nama %></b></td>
+            <td><b><%= fmt.toUpper(r.nama) %></b></td>
             <td><%= r.nra || '-' %></td>
             <td><%= fmt.formatList(r.kelas) %></td>
             <td><%= r.angkatan || '-' %></td>
@@ -105,15 +105,10 @@
           <label>Nama Lengkap <span class="req">*</span></label>
           <input type="text" name="nama" id="a_nama" required />
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Tempat Lahir</label>
-            <input type="text" name="tempat_lahir" id="a_tempat" placeholder="Jeneponto" />
-          </div>
-          <div class="form-group">
-            <label>Tanggal Lahir</label>
-            <input type="date" name="tanggal_lahir" id="a_tgl" />
-          </div>
+        <div class="form-group">
+          <label>Tempat, Tanggal Lahir</label>
+          <input type="text" name="ttl" id="a_ttl" placeholder="Jeneponto, 27 September 2004" autocomplete="off" />
+          <small class="form-hint">Boleh salin-tempel dari GForm. Contoh: <b>Jeneponto, 27 September 2004</b> atau <b>Jeneponto, 27/09/2004</b></small>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -244,8 +239,10 @@
     document.getElementById('formTitle').textContent = 'Edit Anggota';
     const f = document.getElementById('anggotaForm');
     f.action = '/anggota/' + r.id + '/edit'; f.reset();
-    f.a_nama.value = r.nama; f.a_tempat.value = r.tempat_lahir || '';
-    f.a_tgl.value = r.tanggal_lahir || ''; f.a_nra.value = r.nra || '';
+    f.a_nama.value = r.nama;
+    const _tgl = r.tanggal_lahir ? (String(r.tanggal_lahir).match(/^(\d{4})-(\d{2})-(\d{2})/) ? RegExp.$3 + '/' + RegExp.$2 + '/' + RegExp.$1 : r.tanggal_lahir) : '';
+    f.a_ttl.value = [r.tempat_lahir, _tgl].filter(Boolean).join(', ');
+    f.a_nra.value = r.nra || '';
     f.a_angkatan.value = r.angkatan || ''; f.a_alamat.value = r.alamat; f.a_hp.value = r.no_hp;
     f.a_catatan.value = r.catatan || '';
     fillList('kelasList', addKelas, parseList(r.kelas));
@@ -272,13 +269,13 @@
   async function showDetail(id) {
     try {
       const r = await fetchJSON('/anggota/' + id + '/detail');
-      const ttl = [r.tempat_lahir, r.tanggal_lahir].filter(Boolean).join(', ') || '-';
+      const ttl = [titleCase(r.tempat_lahir), r.tanggal_lahir].filter(Boolean).join(', ') || '-';
       const kelas = parseList(r.kelas).join(', ') || '-';
       const jabatan = parseList(r.jabatan).join(', ') || '-';
       let html = '';
       if (r.foto_path) html += '<div class="detail-photo"><img src="/file/' + r.foto_path + '" alt="Foto"></div>';
-      html += row('Nama Lengkap', r.nama) + row('NRA', r.nra || '-') + row('Tempat, Tgl Lahir', ttl) +
-        row('Kelas', kelas) + row('Alamat', r.alamat) + row('No. HP/WA', r.no_hp) +
+      html += row('Nama Lengkap', upper(r.nama)) + row('NRA', r.nra || '-') + row('Tempat, Tgl Lahir', ttl) +
+        row('Kelas', kelas) + row('Alamat', titleCase(r.alamat)) + row('No. HP/WA', r.no_hp) +
         row('Angkatan', r.angkatan || '-') + row('Jabatan', jabatan) + row('Status', r.status);
       if (r.foto_path) {
         html += row('Foto', fileLinks(r.foto_path));
@@ -303,6 +300,8 @@
       '<a href="/file/' + path + '?download=1">Unduh</a>';
   }
   function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+  function upper(v) { return v ? String(v).toUpperCase() : ''; }
+  function titleCase(v) { return v ? String(v).toLowerCase().replace(/(^|[\s'\-.\/(])([a-z])/g, function (m, s, c) { return s + c.toUpperCase(); }) : ''; }
 </script>
 
 <%- include('../partials/bottom') %>

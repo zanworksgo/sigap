@@ -2,6 +2,7 @@
 
 const express = require('express');
 const { get, all, run } = require('../db/pg');
+const { parseTTL } = require('../utils/format');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 const { createUploader, removeFile } = require('../middleware/upload');
 
@@ -71,8 +72,8 @@ function collectList(value) {
 
 function parseBody(req) {
   const nama = (req.body.nama || '').trim();
-  const tempat_lahir = (req.body.tempat_lahir || '').trim() || null;
-  const tanggal_lahir = (req.body.tanggal_lahir || '').trim() || null;
+  // TTL is entered as one pasteable text field (e.g. "Jeneponto, 27 September 2004").
+  const { tempat_lahir, tanggal_lahir } = parseTTL(req.body.ttl);
   const kelas = collectList(req.body.kelas);
   const alamat = (req.body.alamat || '').trim();
   const no_hp = (req.body.no_hp || '').trim();

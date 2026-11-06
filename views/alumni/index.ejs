@@ -41,7 +41,7 @@
                 <span class="anggota-thumb anggota-thumb-empty"><%= r.nama.charAt(0).toUpperCase() %></span>
               <% } %>
             </td>
-            <td><b><%= r.nama %></b></td>
+            <td><b><%= fmt.toUpper(r.nama) %></b></td>
             <td><%= r.nra || '-' %></td>
             <td><%= r.angkatan || '-' %></td>
             <td><%= fmt.formatLast(r.kelas) %></td>
@@ -98,12 +98,12 @@
   async function showDetail(id) {
     try {
       const r = await fetchJSON('/alumni/' + id + '/detail');
-      const ttl = [r.tempat_lahir, r.tanggal_lahir].filter(Boolean).join(', ') || '-';
+      const ttl = [titleCase(r.tempat_lahir), r.tanggal_lahir].filter(Boolean).join(', ') || '-';
       let html = '';
       if (r.foto_path) html += '<div class="detail-photo"><img src="/file/' + r.foto_path + '" alt="Foto"></div>';
-      html += row('Nama Lengkap', r.nama) + row('NRA', r.nra || '-') + row('Tempat, Tgl Lahir', ttl) +
+      html += row('Nama Lengkap', upper(r.nama)) + row('NRA', r.nra || '-') + row('Tempat, Tgl Lahir', ttl) +
         row('Angkatan', r.angkatan || '-') + row('Kelas Terakhir', lastOf(r.kelas)) +
-        row('Jabatan Terakhir', lastOf(r.jabatan)) + row('Alamat', r.alamat) + row('No. HP/WA', r.no_hp);
+        row('Jabatan Terakhir', lastOf(r.jabatan)) + row('Alamat', titleCase(r.alamat)) + row('No. HP/WA', r.no_hp);
       if (r.foto_path) html += row('Foto', fileLinks(r.foto_path));
       if (r.catatan) html += row('Catatan', escapeHtml(r.catatan).replace(/\n/g, '<br>'));
       document.getElementById('detailBody').innerHTML = html;
@@ -111,6 +111,8 @@
     } catch (e) { alert(e.message); }
   }
   function row(k, v) { return '<div class="detail-item"><dt>' + k + '</dt><dd>' + v + '</dd></div>'; }
+  function upper(v) { return v ? String(v).toUpperCase() : ''; }
+  function titleCase(v) { return v ? String(v).toLowerCase().replace(/(^|[\s'\-.\/(])([a-z])/g, function (m, s, c) { return s + c.toUpperCase(); }) : ''; }
 </script>
 
 <%- include('../partials/bottom') %>
