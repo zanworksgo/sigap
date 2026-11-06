@@ -1,7 +1,7 @@
 'use strict';
 
 // Bump this version to force clients to refresh cached static assets.
-const CACHE = 'sigap-static-v1';
+const CACHE = 'sigap-static-v2';
 const ASSETS = [
   '/css/style.css',
   '/css/print.css',
@@ -37,17 +37,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: serve from cache first, fall back to network and cache it.
+  // Static assets: stale-while-revalidate. Serve cache for speed, but always
+  // fetch in the background to refresh the cache so edits show up next load.
   if (/^\/(css|js|img)\//.test(url.pathname) || url.pathname === '/manifest.webmanifest') {
     event.respondWith(
-      caches.match(req).then((hit) =>
-        hit ||
-        fetch(req).then((res) => {
+      caches.match(req).then((hit) => {
+        const fetchPromise = fetch(req).then((res) => {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy));
           return res;
-        }).catch(() => hit)
-      )
+        }).catch(() => hit);
+        return hit || fetchPromise;
+      })
     );
   }
 });

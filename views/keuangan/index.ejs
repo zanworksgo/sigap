@@ -93,7 +93,7 @@
           </div>
           <div class="form-group">
             <label>Nominal (Rp) <span class="req">*</span></label>
-            <input type="number" name="nominal" id="t_nominal" min="0" step="1" required />
+            <input type="text" inputmode="numeric" data-rupiah name="nominal" id="t_nominal" required />
           </div>
         </div>
         <div class="form-group">
@@ -143,6 +143,7 @@
     const f = document.getElementById('trxForm');
     f.action = BASE + '/' + r.id + '/edit';
     f.t_tanggal.value = r.tanggal; f.t_nominal.value = r.nominal;
+    formatRupiahField(f.t_nominal);
     f.t_uraian.value = r.uraian;
     f.t_keterangan.value = r.keterangan || '';
     openModal('formModal');

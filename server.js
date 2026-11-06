@@ -4,17 +4,22 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
-require('express-async-errors');
 const session = require('express-session');
-const pgSession = require('connect-pg-simple')(session);
+const SQLiteStore = require('connect-sqlite3')(session);
 
-const { init, pool, get, SCHEMA } = require('./db/pg');
-const { initStorage } = require('./db/storage');
+const { init, db } = require('./db/database');
 const { MODULES, ROLE_ACCESS, canAccess, canWrite } = require('./config/permissions');
 const BIDANG = require('./config/bidang');
 const KEPANITIAAN = require('./config/kepanitiaan');
 const format = require('./utils/format');
 const { requireAuth } = require('./middleware/auth');
+
+init();
+
+// First run on a fresh database (e.g. new hosting volume): create default users.
+if (db.prepare('SELECT COUNT(*) AS c FROM users').get().c === 0) {
+  require('./db/seed').seed({ log: false });
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,34 +36,24 @@ app.set('views', path.join(__dirname, 'views'));
 // Live reload (development only): auto-refresh the browser on file changes.
 const LIVE_RELOAD = process.env.NODE_ENV !== 'production';
 if (LIVE_RELOAD) {
-  try {
-    const livereload = require('livereload');
-    const lrServer = livereload.createServer({ exts: ['ejs', 'css', 'js'], delay: 120 });
-    // A stale live-reload server (port 35729 in use) must not crash the app.
-    lrServer.server.on('error', (err) => {
-      console.warn('Live reload nonaktif:', err.code || err.message);
-    });
-    lrServer.watch([path.join(__dirname, 'views'), path.join(__dirname, 'public')]);
-    // Reload the browser once the server process has restarted.
-    lrServer.server.once('connection', () => {
-      setTimeout(() => lrServer.refresh('/'), 120);
-    });
-  } catch (err) {
-    console.warn('Live reload gagal dimulai:', err.message);
-  }
+  const livereload = require('livereload');
+  const lrServer = livereload.createServer({ exts: ['ejs', 'css', 'js'], delay: 120 });
+  lrServer.watch([path.join(__dirname, 'views'), path.join(__dirname, 'public')]);
+  // Reload the browser once the server process has restarted.
+  lrServer.server.once('connection', () => {
+    setTimeout(() => lrServer.refresh('/'), 120);
+  });
 }
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+fs.mkdirSync(dataDir, { recursive: true });
+
 app.use(session({
-  store: new pgSession({
-    pool,
-    schemaName: SCHEMA,
-    tableName: 'session',
-    createTableIfMissing: true
-  }),
+  store: new SQLiteStore({ db: 'sessions.db', dir: dataDir }),
   secret: process.env.SESSION_SECRET || 'sigap-secret',
   resave: false,
   saveUninitialized: false,
@@ -77,7 +72,6 @@ const MENU = [
   { key: 'surat_masuk', label: 'Surat Masuk', href: '/surat-masuk', icon: 'inbox' },
   { key: 'surat_keluar', label: 'Surat Keluar', href: '/surat-keluar', icon: 'send' },
   { key: 'kode_surat', label: 'Aturan Surat', href: '/kode-surat', icon: 'book' },
-  { key: 'sertifikat', label: 'Sertifikat', href: '/sertifikat', icon: 'certificate' },
   { key: 'anggota', label: 'Data Anggota Aktif', href: '/anggota', icon: 'user-check' },
   { key: 'alumni', label: 'Data Alumni', href: '/alumni', icon: 'award' },
   { key: 'dokumentasi', label: 'Dokumentasi Kegiatan', href: '/dokumentasi', icon: 'camera' },
@@ -100,7 +94,7 @@ app.use((req, res, next) => {
   res.locals.canWrite = (mod) => (user ? canWrite(user.role, mod) : false);
   res.locals.canAccess = (mod) => (user ? canAccess(user.role, mod) : false);
   // Modules grouped under a role/bidang heading in the sidebar.
-  const SEKRETARIS_MODULES = ['surat_masuk', 'surat_keluar', 'kode_surat', 'sertifikat'];
+  const SEKRETARIS_MODULES = ['surat_masuk', 'surat_keluar', 'kode_surat'];
   const BENDAHARA_MODULES = ['pemasukan', 'pengeluaran', 'laporan'];
   const HUMAS_MODULES = ['anggota', 'alumni', 'dokumentasi'];
   const GROUPED_MODULES = [...SEKRETARIS_MODULES, ...BENDAHARA_MODULES, ...HUMAS_MODULES];
@@ -174,7 +168,6 @@ app.use('/users', requireAuth, require('./routes/users'));
 app.use('/surat-masuk', requireAuth, require('./routes/suratMasuk'));
 app.use('/surat-keluar', requireAuth, require('./routes/suratKeluar'));
 app.use('/kode-surat', requireAuth, require('./routes/kodeSurat'));
-app.use('/sertifikat', requireAuth, require('./routes/sertifikat'));
 app.use('/anggota', requireAuth, require('./routes/anggota'));
 app.use('/alumni', requireAuth, require('./routes/alumni'));
 app.use('/pemasukan', requireAuth, require('./routes/pemasukan'));
@@ -230,40 +223,6 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || 'Terjadi kesalahan pada server.' });
 });
 
-// Initialise the database, seed defaults on first run, then start listening.
-async function start() {
-  await init();
-  await initStorage();
-
-  // One-time data import from the legacy SQLite volume into Supabase.
-  // Set RUN_SQLITE_MIGRATION=1 for the first deploy, then remove it.
-  if (process.env.RUN_SQLITE_MIGRATION === '1') {
-    try {
-      await require('./db/migrate-to-pg').migrate(process.env.SQLITE_PATH);
-    } catch (err) {
-      // Don't crash the app on migration failure; log and keep serving.
-      console.error('Migrasi data gagal (app tetap jalan):', err);
-    }
-  } else {
-    const row = await get('SELECT COUNT(*) AS c FROM users');
-    if (Number(row.c) === 0) {
-      await require('./db/seed').seed({ log: false });
-    }
-  }
-
-  app.listen(PORT, () => {
-    console.log(`SIGAP berjalan di http://localhost:${PORT}`);
-  });
-}
-
-// On Vercel the app runs as a serverless function: export the app and skip the
-// listen/init bootstrap (schema & storage are already provisioned in Supabase).
-if (process.env.VERCEL) {
-  module.exports = app;
-} else {
-  start().catch((err) => {
-    console.error('Gagal memulai server:', err);
-    process.exit(1);
-  });
-  module.exports = app;
-}
+app.listen(PORT, () => {
+  console.log(`SIGAP berjalan di http://localhost:${PORT}`);
+});

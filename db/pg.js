@@ -15,13 +15,10 @@ const ROLE_CHECK = ALL_ROLES.map((r) => `'${String(r).replace(/'/g, "''")}'`).jo
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: Number(process.env.PG_POOL_MAX || 5),
-  ssl: { rejectUnauthorized: false }
-});
-
-// Fallback: ensure each new connection resolves unqualified names in our schema.
-// (The durable fix is the ALTER ROLE ... SET search_path applied in init().)
-pool.on('connect', (client) => {
-  client.query(`SET search_path TO ${SCHEMA}, public`).catch(() => { });
+  ssl: { rejectUnauthorized: false },
+  // Set search_path at connection startup instead of firing a separate query
+  // on 'connect' (which raced with pool.query and triggered a pg deprecation).
+  options: `-c search_path=${SCHEMA},public`
 });
 
 // Translate the SQLite dialect used across the app into PostgreSQL.

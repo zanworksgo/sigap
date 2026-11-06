@@ -71,7 +71,7 @@ if (!window.__sigapBound) {
       btn.disabled = true;
       const orig = btn.innerHTML;
       btn.dataset.orig = orig;
-      btn.innerHTML = 'Menyimpan...';
+      btn.innerHTML = btn.dataset.loading || 'Menyimpan...';
       // Re-enable if navigation somehow does not occur.
       setTimeout(() => {
         if (btn.disabled) { btn.disabled = false; btn.innerHTML = orig; }
@@ -84,6 +84,17 @@ if (!window.__sigapBound) {
   document.addEventListener('turbo:click', (e) => {
     if ((e.detail.url || '').includes('/file/')) e.preventDefault();
   });
+
+  // Rupiah inputs: show thousand separators while typing, submit raw digits.
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el && el.matches && el.matches('input[data-rupiah]')) formatRupiahField(el);
+  });
+  document.addEventListener('submit', (e) => {
+    e.target.querySelectorAll('input[data-rupiah]').forEach((el) => {
+      el.value = el.value.replace(/\D/g, '');
+    });
+  }, true);
 }
 
 // ===== Per-page init: runs on first load and after each Turbo navigation =====
@@ -119,6 +130,13 @@ function restoreSidebarScroll() {
 // ===== Delete confirmation =====
 function confirmDelete(message) {
   return confirm(message || 'Yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan.');
+}
+
+// Format a text input into Indonesian thousand separators (e.g. 1.000.000).
+// The dots are stripped again on submit so the server receives a plain integer.
+function formatRupiahField(el) {
+  const digits = el.value.replace(/\D/g, '');
+  el.value = digits ? Number(digits).toLocaleString('id-ID') : '';
 }
 
 // ===== Fetch JSON helper for detail/edit modals =====
