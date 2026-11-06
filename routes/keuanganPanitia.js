@@ -8,7 +8,7 @@
 //   - Pengeluaran   : pengeluaran panitia
 //   - Pengembalian  : sisa dana dikembalikan ke Kas Umum
 const express = require('express');
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 const { createUploader, removeFile } = require('../middleware/upload');
 
@@ -23,7 +23,7 @@ function keuanganPanitiaRouter(panitia) {
 
     router.use(requireAccess(MOD));
 
-    function buildList(req) {
+    async function buildList(req) {
         const q = (req.query.q || '').trim();
         const jenis = (req.query.jenis || '').trim();
         const bulan = (req.query.bulan || '').trim();
@@ -39,25 +39,26 @@ function keuanganPanitiaRouter(panitia) {
         if (bulan) { sql += " AND strftime('%m', tanggal) = ?"; params.push(String(bulan).padStart(2, '0')); }
         if (tahun) { sql += " AND strftime('%Y', tanggal) = ?"; params.push(tahun); }
         sql += ' ORDER BY tanggal ASC, id ASC';
-        const rows = db.prepare(sql).all(...params);
+        const rows = await all(sql, params);
 
         return { rows, filters: { q, jenis, bulan, tahun } };
     }
 
     // Totals per jenis across the whole panitia (ignores list filters) so the
     // saldo cards always reflect the true committee balance.
-    function summary() {
+    async function summary() {
         const sums = { Alokasi: 0, Pemasukan: 0, Pengeluaran: 0, Pengembalian: 0 };
-        const rows = db.prepare(
-            "SELECT jenis, COALESCE(SUM(nominal),0) total FROM transaksi_panitia WHERE deleted_at IS NULL AND kepanitiaan = ? GROUP BY jenis"
-        ).all(panitia.key);
-        rows.forEach((r) => { sums[r.jenis] = r.total; });
+        const rows = await all(
+            "SELECT jenis, COALESCE(SUM(nominal),0) total FROM transaksi_panitia WHERE deleted_at IS NULL AND kepanitiaan = ? GROUP BY jenis",
+            [panitia.key]
+        );
+        rows.forEach((r) => { sums[r.jenis] = Number(r.total); });
         const saldo = sums.Alokasi + sums.Pemasukan - sums.Pengeluaran - sums.Pengembalian;
         return { ...sums, saldo };
     }
 
-    router.get('/', (req, res) => {
-        const { rows, filters } = buildList(req);
+    router.get('/', async (req, res) => {
+        const { rows, filters } = await buildList(req);
         res.render('panitia-keuangan/index', {
             title: 'Keuangan ' + panitia.label,
             panitia,
@@ -65,26 +66,26 @@ function keuanganPanitiaRouter(panitia) {
             jenisList: JENIS,
             rows,
             filters,
-            sum: summary(),
+            sum: await summary(),
             flash: req.query.msg || null,
             flashType: req.query.type || 'success'
         });
     });
 
-    router.get('/print', (req, res) => {
-        const { rows, filters } = buildList(req);
+    router.get('/print', async (req, res) => {
+        const { rows, filters } = await buildList(req);
         res.render('panitia-keuangan/print', {
             title: 'Cetak Keuangan ' + panitia.label,
             layout: false,
             panitia,
             rows,
             filters,
-            sum: summary()
+            sum: await summary()
         });
     });
 
-    router.get('/:id/detail', (req, res) => {
-        const row = db.prepare('SELECT * FROM transaksi_panitia WHERE id = ? AND kepanitiaan = ? AND deleted_at IS NULL').get(req.params.id, panitia.key);
+    router.get('/:id/detail', async (req, res) => {
+        const row = await get('SELECT * FROM transaksi_panitia WHERE id = ? AND kepanitiaan = ? AND deleted_at IS NULL', [req.params.id, panitia.key]);
         if (!row) return res.status(404).json({ error: 'Data tidak ditemukan.' });
         res.json(row);
     });
@@ -105,7 +106,7 @@ function keuanganPanitiaRouter(panitia) {
         return null;
     }
 
-    router.post('/', requireWrite(MOD), upload.single('bukti'), (req, res) => {
+    router.post('/', requireWrite(MOD), upload.single('bukti'), async (req, res) => {
         const d = parseBody(req);
         const err = validate(d);
         if (err) {
@@ -115,15 +116,16 @@ function keuanganPanitiaRouter(panitia) {
         const bukti_path = req.file ? subdir + '/' + req.file.filename : null;
         const bukti_original = req.file ? req.file.originalname : null;
 
-        db.prepare(
+        await run(
             `INSERT INTO transaksi_panitia (kepanitiaan, jenis, tanggal, uraian, nominal, keterangan, bukti_path, bukti_original, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).run(panitia.key, d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, req.session.user.id);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [panitia.key, d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, req.session.user.id]
+        );
         res.redirect(`${base}?msg=` + encodeURIComponent('Transaksi berhasil ditambahkan.'));
     });
 
-    router.post('/:id/edit', requireWrite(MOD), upload.single('bukti'), (req, res) => {
-        const row = db.prepare('SELECT * FROM transaksi_panitia WHERE id = ? AND kepanitiaan = ? AND deleted_at IS NULL').get(req.params.id, panitia.key);
+    router.post('/:id/edit', requireWrite(MOD), upload.single('bukti'), async (req, res) => {
+        const row = await get('SELECT * FROM transaksi_panitia WHERE id = ? AND kepanitiaan = ? AND deleted_at IS NULL', [req.params.id, panitia.key]);
         if (!row) {
             if (req.file) removeFile(subdir + '/' + req.file.filename);
             return res.redirect(`${base}?type=error&msg=` + encodeURIComponent('Data tidak ditemukan.'));
@@ -143,15 +145,16 @@ function keuanganPanitiaRouter(panitia) {
             bukti_original = req.file.originalname;
         }
 
-        db.prepare(
+        await run(
             `UPDATE transaksi_panitia SET jenis=?, tanggal=?, uraian=?, nominal=?, keterangan=?, bukti_path=?, bukti_original=?, updated_at=datetime('now','localtime')
-       WHERE id=?`
-        ).run(d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, row.id);
+       WHERE id=?`,
+            [d.jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, row.id]
+        );
         res.redirect(`${base}?msg=` + encodeURIComponent('Transaksi berhasil diperbarui.'));
     });
 
-    router.post('/:id/delete', requireWrite(MOD), (req, res) => {
-        db.prepare("UPDATE transaksi_panitia SET deleted_at=datetime('now','localtime') WHERE id=? AND kepanitiaan=?").run(req.params.id, panitia.key);
+    router.post('/:id/delete', requireWrite(MOD), async (req, res) => {
+        await run("UPDATE transaksi_panitia SET deleted_at=datetime('now','localtime') WHERE id=? AND kepanitiaan=?", [req.params.id, panitia.key]);
         res.redirect(`${base}?msg=` + encodeURIComponent('Transaksi dihapus.'));
     });
 

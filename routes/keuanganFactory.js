@@ -1,7 +1,7 @@
 'use strict';
 
 // Shared implementation for Pemasukan/Pengeluaran to avoid duplication.
-const { db } = require('../db/database');
+const { get, all, run } = require('../db/pg');
 const { requireAccess, requireWrite } = require('../middleware/auth');
 const { createUploader, removeFile } = require('../middleware/upload');
 
@@ -13,7 +13,7 @@ function makeTransaksiRouter(jenis, moduleKey, basePath) {
 
   router.use(requireAccess(moduleKey));
 
-  function buildList(req) {
+  async function buildList(req) {
     const q = (req.query.q || '').trim();
     const bulan = (req.query.bulan || '').trim();
     const tahun = (req.query.tahun || '').trim();
@@ -33,13 +33,13 @@ function makeTransaksiRouter(jenis, moduleKey, basePath) {
       params.push(tahun);
     }
     sql += ' ORDER BY tanggal ASC, id ASC';
-    const rows = db.prepare(sql).all(...params);
-    const total = rows.reduce((s, r) => s + r.nominal, 0);
+    const rows = await all(sql, params);
+    const total = rows.reduce((s, r) => s + Number(r.nominal), 0);
     return { rows, total, filters: { q, bulan, tahun } };
   }
 
-  router.get('/', (req, res) => {
-    const { rows, total, filters } = buildList(req);
+  router.get('/', async (req, res) => {
+    const { rows, total, filters } = await buildList(req);
     res.render('keuangan/index', {
       title: label,
       jenis,
@@ -53,13 +53,13 @@ function makeTransaksiRouter(jenis, moduleKey, basePath) {
     });
   });
 
-  router.get('/print', (req, res) => {
-    const { rows, total, filters } = buildList(req);
+  router.get('/print', async (req, res) => {
+    const { rows, total, filters } = await buildList(req);
     res.render('keuangan/print', { title: `Cetak ${label}`, layout: false, jenis, rows, total, filters });
   });
 
-  router.get('/:id/detail', (req, res) => {
-    const row = db.prepare('SELECT * FROM transaksi WHERE id = ? AND jenis = ? AND deleted_at IS NULL').get(req.params.id, jenis);
+  router.get('/:id/detail', async (req, res) => {
+    const row = await get('SELECT * FROM transaksi WHERE id = ? AND jenis = ? AND deleted_at IS NULL', [req.params.id, jenis]);
     if (!row) return res.status(404).json({ error: 'Data tidak ditemukan.' });
     res.json(row);
   });
@@ -78,7 +78,7 @@ function makeTransaksiRouter(jenis, moduleKey, basePath) {
     return null;
   }
 
-  router.post('/', requireWrite(moduleKey), upload.single('bukti'), (req, res) => {
+  router.post('/', requireWrite(moduleKey), upload.single('bukti'), async (req, res) => {
     const d = parseBody(req);
     const err = validate(d);
     if (err) {
@@ -88,16 +88,17 @@ function makeTransaksiRouter(jenis, moduleKey, basePath) {
     const bukti_path = req.file ? basePath + '/' + req.file.filename : null;
     const bukti_original = req.file ? req.file.originalname : null;
 
-    db.prepare(
+    await run(
       `INSERT INTO transaksi (jenis, tanggal, uraian, nominal, keterangan, bukti_path, bukti_original, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, req.session.user.id);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [jenis, d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, req.session.user.id]
+    );
 
     res.redirect(`/${basePath}?msg=` + encodeURIComponent(`${label} berhasil ditambahkan.`));
   });
 
-  router.post('/:id/edit', requireWrite(moduleKey), upload.single('bukti'), (req, res) => {
-    const row = db.prepare('SELECT * FROM transaksi WHERE id = ? AND jenis = ? AND deleted_at IS NULL').get(req.params.id, jenis);
+  router.post('/:id/edit', requireWrite(moduleKey), upload.single('bukti'), async (req, res) => {
+    const row = await get('SELECT * FROM transaksi WHERE id = ? AND jenis = ? AND deleted_at IS NULL', [req.params.id, jenis]);
     if (!row) {
       if (req.file) removeFile(basePath + '/' + req.file.filename);
       return res.redirect(`/${basePath}?type=error&msg=` + encodeURIComponent('Data tidak ditemukan.'));
@@ -117,16 +118,17 @@ function makeTransaksiRouter(jenis, moduleKey, basePath) {
       bukti_original = req.file.originalname;
     }
 
-    db.prepare(
+    await run(
       `UPDATE transaksi SET tanggal=?, uraian=?, nominal=?, keterangan=?, bukti_path=?, bukti_original=?, updated_at=datetime('now','localtime')
-       WHERE id=?`
-    ).run(d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, row.id);
+       WHERE id=?`,
+      [d.tanggal, d.uraian, d.nominal, d.keterangan, bukti_path, bukti_original, row.id]
+    );
 
     res.redirect(`/${basePath}?msg=` + encodeURIComponent(`${label} berhasil diperbarui.`));
   });
 
-  router.post('/:id/delete', requireWrite(moduleKey), (req, res) => {
-    db.prepare(`UPDATE transaksi SET deleted_at=datetime('now','localtime') WHERE id=? AND jenis=?`).run(req.params.id, jenis);
+  router.post('/:id/delete', requireWrite(moduleKey), async (req, res) => {
+    await run(`UPDATE transaksi SET deleted_at=datetime('now','localtime') WHERE id=? AND jenis=?`, [req.params.id, jenis]);
     res.redirect(`/${basePath}?msg=` + encodeURIComponent(`${label} dihapus.`));
   });
 
