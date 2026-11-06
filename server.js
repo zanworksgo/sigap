@@ -94,7 +94,7 @@ app.use((req, res, next) => {
   res.locals.appName = 'SIGAP';
   res.locals.appLong = 'Sistem Informasi dan Gerbang Administrasi Paskibra';
   res.locals.org = 'Paskibra SMA Negeri 1 Jeneponto';
-  res.locals.copyright = '\u00A9 2026 <a href="https://instagram.com/fauzan_azhri.zip" target="_blank" rel="noopener noreferrer" style="color:var(--primary);font-weight:600;">Farhan</a>. All Rights Reserved.';
+  res.locals.copyright = '\u00A9 2026 <a href="https://fauzanazhari.vercel.app/" target="_blank" rel="noopener noreferrer" style="color:var(--primary);font-weight:600;">Farhan</a>. All Rights Reserved.';
   res.locals.fmt = format;
   res.locals.liveReload = LIVE_RELOAD;
   res.locals.canWrite = (mod) => (user ? canWrite(user.role, mod) : false);
